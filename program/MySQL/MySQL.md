@@ -1,3 +1,7 @@
+---
+typora-root-url: picture
+---
+
 ###### 数据库安全加强脚本
 
 ```
@@ -10,7 +14,7 @@ mysql_secure_installation
 
 #### MySQL的逻辑框架图
 
-<img src="E:\Guangdong_inlay\Linux_study\Typora_md_file\picture\Mysql存储结构.png" alt="Mysql存储结构" style="zoom:80%;" />
+<img src="E:/Guangdong_inlay/Linux_study/Typora_md_file/picture/Mysql%E5%AD%98%E5%82%A8%E7%BB%93%E6%9E%84.png" alt="Mysql存储结构" style="zoom:80%;" />
 
 服务器通过API与存储引擎进行通信。
 
