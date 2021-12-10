@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "printf.h": "c",
+        "bubblesort.h": "c",
+        "stdio.h": "c",
+        "unistd.h": "c",
+        "wait.h": "c",
+        "types.h": "c",
+        "stdlib.h": "c",
+        "signal.h": "c"
+    }
+}
