@@ -15,6 +15,7 @@ struct Node *  head = NULL;
 
 //生产者函数
 void * producer(void * arg){
+    
     //头插法：往连表内插入节点
     while(1){
         struct  Node *  node = (struct  Node * )malloc(sizeof(struct  Node));
