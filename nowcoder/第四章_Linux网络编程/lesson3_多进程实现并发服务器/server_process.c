@@ -4,7 +4,33 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
+#include <errno.h>
+#include <signal.h>
+#include <wait.h>
+void  Mywork(int arg){
+    printf("捕捉到的信号  %d\n" , arg);
+    while(1){
+        int ret = waitpid( -1 , NULL , WNOHANG);
+        if(ret > 0){
+            printf("child die , pid = %d\n" , ret);
+        }else if( ret == -1){
+            //所以子进程退出
+            break;
+        }else if( ret == 0){
+            //还有子进程存活
+            break;
+        }
+    }
+}
 int main(){
+    //注册信号捕捉，用于父进程回收子进程资源
+    struct sigaction  act;
+    act.sa_flags = 0;//使用sa_handler函数处理
+    act.sa_handler = Mywork;
+    sigemptyset(&act.sa_mask);//临时阻塞的信号集置为空
+    sigaction( SIGCHLD, &act, NULL);
+
+
     //1、创建socket
     int lfd = socket( AF_INET , SOCK_STREAM , 0);
     if( -1 == lfd ){
@@ -36,6 +62,10 @@ int main(){
         socklen_t size = sizeof(client_addr);
         int client_fd = accept( lfd ,(struct sockaddr *)&client_addr , &size);
         if( -1 == client_fd ){
+            if(errno == EINTR){//accept会被sigaction函数(软中断)打断，再回到accept函数时，该函数就不会阻塞，返回值为-1
+                                //errno 被设置为EINTR，所以这里作一下判断
+                continue;
+            }
             perror("accept:");
             close(lfd);
             exit(-1);
@@ -63,18 +93,18 @@ int main(){
                     exit(-1);
                 }
                 else if( len > 0){  // 读到数据
-                    printf("recv client data : %s\n" , recvBuf);
+                    printf("recv client : %s\n" , recvBuf);
                 }
                 else if(len == 0){  // 客户端断开连接
                     printf("client close...\n");
                     break;
                 }
                 //回射
-                write( client_fd , recvBuf , strlen(recvBuf));
+                write( client_fd , recvBuf , strlen(recvBuf) + 1);
             }
             //关闭连接
             close(client_fd);
-            exit(0);//退出子进程
+            exit(0);    // 退出当前子进程
         }
     }
     close(lfd);//关闭监听文件描述符
