@@ -1,7 +1,7 @@
 #include <stdio.h>
+#include <arpa/inet.h>
 #include <stdlib.h>
 #include <string.h>
-#include <arpa/inet.h>
 #include <unistd.h>
 #include <pthread.h>
 
@@ -11,6 +11,8 @@ struct sockinfo{
     pthread_t  tid;//线程tid
 };
 struct sockinfo  client_info[128];
+
+
 void * My_work(void * arg){
     struct sockinfo * pinfo = (struct sockinfo *)arg;
     //输出客户端信息
@@ -75,6 +77,7 @@ int main(){
         client_info[i].fd = -1;
         client_info[i].tid = -1;
     }
+    printf("wait connect ....\n");
     //4、循环等待客户端连接
     while(1){
         //接收连接
@@ -105,7 +108,7 @@ int main(){
 
         pthread_create( &pinfo->tid , NULL , My_work , (void *)pinfo);
         //设置线程分离
-        pthread_detach(pinfo->fd);
+        pthread_detach(pinfo->tid);
     }
     close(lfd);//关闭监听文件描述符
     return 0;
