@@ -30,6 +30,7 @@ int main(){
     while(i <= 6){
         //发送数据
         sprintf(recvBuf , "data : %d" , i++);
+        sleep(1);//延时1s
         write( fd , recvBuf , strlen(recvBuf) + 1);
 
         
@@ -47,7 +48,7 @@ int main(){
             printf("server close...\n");
         }
         bzero(recvBuf , sizeof(recvBuf));
-        sleep(1);//延时1s
+        
     }
     
     //关闭连接

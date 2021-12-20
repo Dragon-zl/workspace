@@ -3,6 +3,13 @@
         "inet.h": "c",
         "stdio.h": "c",
         "wait.h": "c",
-        "unistd.h": "c"
+        "unistd.h": "c",
+        "select.h": "c",
+        "time.h": "c",
+        "stdlib.h": "c",
+        "string.h": "c",
+        "types.h": "c",
+        "socket.h": "c",
+        "poll.h": "c"
     }
 }
