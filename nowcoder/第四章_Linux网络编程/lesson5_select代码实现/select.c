@@ -61,7 +61,7 @@ int main(){
                 maxfd = maxfd > client_fd ? maxfd:client_fd;
             }
             //遍历文件描述符
-            for(int i = lfd + 1 ; i<maxfd ; i++){
+            for(int i = lfd + 1 ; i< maxfd + 1; i++){
                 if( FD_ISSET(i , &tmp) ){
                     //说明这个文件描述符的客户端发送了数据
                     char buf[1024] = {0};
