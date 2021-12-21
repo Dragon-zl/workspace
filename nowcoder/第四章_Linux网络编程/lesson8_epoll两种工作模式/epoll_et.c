@@ -1,8 +1,10 @@
+#include <errno.h>
 #include <sys/epoll.h>
 #include <stdio.h>
 #include <string.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <stdlib.h>
 int main(){
     //1、创建套接字
@@ -58,6 +60,11 @@ int main(){
                 struct sockaddr_in client_addr;
                 socklen_t size = sizeof(client_addr);
                 int client_fd = accept( lfd , (struct sockaddr *)&client_addr , &size);
+                //设置 client_fd 为非阻塞
+                int flag = fcntl(client_fd , F_GETFD);//先获取
+                flag |= O_NONBLOCK;
+                fcntl(client_fd , F_SETFD  , flag);//再设置
+
                 //打印客户端的信息
                 char  client_ip[16] = {0};
                 inet_ntop( AF_INET , &client_addr.sin_addr.s_addr , client_ip , sizeof(client_ip));
@@ -66,29 +73,33 @@ int main(){
 
                 //将新的与客户端通信的文件描述符，添加到epfd中
                 struct epoll_event event;
-                event.events = EPOLLIN;//设置监听读事件
+                event.events = EPOLLIN | EPOLLET;//设置监听读事件 边沿触发
                 event.data.fd = client_fd;
                 epoll_ctl( epfd, EPOLL_CTL_ADD , client_fd, &event);
             }
             else{
                 //有数据到达，需要通信
-                char buf[1024] = {0};
-                int len = read( curfd, buf , sizeof(buf));
-                if(len == -1){
-                    perror("read:");
-                    exit(-1);
+                //读取所有数据(循环)，且设置 client_fd 为非阻塞
+                char buf[5] = {0};
+                int len = 0;
+                while( (len = read(curfd , buf , sizeof(buf))) > 0){
+                    //打印数据
+                    printf("recv data :%s\n" , buf);
+                    write( curfd , buf  , strlen(buf));
                 }
-                else if(len == 0){//客户端断开
-                    printf("client close\n");
-                    //调用epoll_ctl删除
-                    epoll_ctl( epfd, EPOLL_CTL_DEL , curfd , NULL);
-                    close( curfd );
+                if(len == 0){
+                    //客户端断开连接
+                    printf("client close....\n");
                 }
-                else if(len > 0){
-                    printf("client data: %s\n" , buf);
-                    write( curfd  , buf , strlen(buf) + 1);
+                else if(len == -1){
+                    if(errno == EAGAIN){
+                        printf("data over...\n");
+                    }
+                    else{
+                        perror("read");
+                        exit(-1);  
+                    }
                 }
-
             }
         }
     }

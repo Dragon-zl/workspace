@@ -72,7 +72,7 @@ int main(){
             }
             else{
                 //有数据到达，需要通信
-                char buf[1024] = {0};
+                char buf[5] = {0};
                 int len = read( curfd, buf , sizeof(buf));
                 if(len == -1){
                     perror("read:");
