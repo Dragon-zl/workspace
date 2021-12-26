@@ -62,6 +62,7 @@ public:
     HTTP_CODE parse_headers(char * text);
     //解析请求体
     HTTP_CODE parse_content(char * text);
+    HTTP_CODE do_request();
     //解析一行
     LINE_STATUS  parse_line();
     
@@ -81,6 +82,16 @@ private:
     //主状态机当前所处的状态
     CHECK_STATE  My_check_state;
 
+    //请求目标文件的文件名
+    char * My_url;
+    //协议版本 ， 这里设置只支持 HTTP1.1
+    char * My_version;
+    //请求方法
+    METHOD My_method;
+    //主机名
+    char * My_host;
+    //HTTP请求是否保持连接
+    bool  My_linger;
     //初始化 数据
     void init();
     //获取一行的其实位置

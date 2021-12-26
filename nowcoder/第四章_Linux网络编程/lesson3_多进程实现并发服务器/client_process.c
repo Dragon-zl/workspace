@@ -17,7 +17,7 @@ int main(){
     //设置IP
     inet_pton(AF_INET , "192.168.150.130" , (void *)&server_addr.sin_addr.s_addr); 
     //设置端口
-    server_addr.sin_port = htons(9999);//端口号要与服务器的一致
+    server_addr.sin_port = htons(10002);//端口号要与服务器的一致
     int ret = connect( fd , (struct sockaddr *)&server_addr , sizeof(server_addr) );
     if(-1 == ret ){
         perror("connect:");

@@ -4,6 +4,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
+#include <strings.h>
+#include <string.h>
 int http_conn::My_epollfd = -1;     
 int http_conn::My_users_count = 0;    
 
@@ -70,6 +72,13 @@ void http_conn:: init(){
     My_check_index = 0;
     My_start_line = 0;
     My_read_index = 0;
+    My_method = GET;
+    My_url = NULL;
+    My_version = NULL;
+    My_linger - false;
+    My_host = NULL;
+    //清空缓冲区
+    bzero( My_Read_buf , READ_BUFFER_SIZE);
 }
 //非阻塞的读
 bool http_conn:: read(){
@@ -117,25 +126,87 @@ http_conn:: HTTP_CODE http_conn:: process_read(){
                 
                 switch (My_check_state)
                 {
-                case CHECK_STATE_REQUESTLINE:
-                {
-
+                    case CHECK_STATE_REQUESTLINE:   //分析请求行
+                    {
+                        //解析，返回结果
+                        ret = parse_request_line(text);
+                        if( ret == BAD_REQUEST){
+                            return BAD_REQUEST; //如果语法错误，直接退出
+                        }
+                        break;
+                    }
+                    case CHECK_STATE_HEADER:        //分析头部字段
+                    {
+                        ret = parse_headers(text);
+                        if( ret == BAD_REQUEST){
+                            return BAD_REQUEST; //如果语法错误，直接退出
+                        }
+                        else if(ret == GET_REQUEST){//完整的请求头
+                            return do_request();
+                        }
+                    }
+                    case CHECK_STATE_CONTENT:       //分析请求体
+                    {
+                        ret = parse_content(text);
+                        if( ret == BAD_REQUEST){
+                            return BAD_REQUEST; //如果语法错误，直接退出
+                        }
+                        else if(ret == GET_REQUEST){//完整的请求头
+                            return do_request();
+                        }
+                        line_status = LINE_OPEN;
+                        break;
+                    }
+                    default:
+                    {
+                        //return INTERNAL_ERROR;//内部错误
+                        break;
+                    }
+                        
                 }
-                    break;
-                case CHECK_STATE_HEADER:
-                {
-
-                }
-                    break;
-                default:
-                    break;
-                }
-
+                return NO_REQUEST;
             }
 }
-//解析请求首行
+//解析HTTP请求行，获取请求方法，目标URL，HTTP版本
 http_conn:: HTTP_CODE http_conn:: parse_request_line(char * text){
 
+    //这里最高效的方法是使用正则表达式去解析，这里牛客网使用的是传统的方法
+
+    //GET /index.html HTTP/1.1
+    My_url = strpbrk( text , " \t");
+    //GET\0/index.html HTTP/1.1
+    *My_url++ = '\0';
+
+    char * method = text;
+    //不区分大小写的字符串比较函数
+    if( strcasecmp(method , "GET") == 0){
+        My_method = GET;
+    }
+    else{
+        return BAD_REQUEST;
+    }
+    My_version = strpbrk( text , " \t");
+    if( !My_version ){
+        return BAD_REQUEST;
+    }
+    //GET /index.html\0HTTP/1.1
+    *My_version++ = '\0';
+    if( strcasecmp(My_version , "HTTP/1.1") != 0){
+        return BAD_REQUEST;
+    }
+    //http://192.168.1.1:10000/index.html
+    //比较My_url前 7 个字符是否 为 "http://"
+    if( strncasecmp( My_url , "http://" , 7) == 0){
+        My_url += 7;
+        My_url = strchr( My_url , '/'); //index.html
+    }
+
+    if( !My_url || My_url[0] != '/'){
+        return BAD_REQUEST;
+    }
+    //主状态机的状态改为改为检查请求头
+    My_check_state = CHECK_STATE_HEADER;
+    return NO_REQUEST;
 }
 //解析请求头
 http_conn:: HTTP_CODE http_conn:: parse_headers(char * text){
@@ -145,9 +216,37 @@ http_conn:: HTTP_CODE http_conn:: parse_headers(char * text){
 http_conn:: HTTP_CODE http_conn:: parse_content(char * text){
 
 }
-//解析一行
-http_conn::  LINE_STATUS  http_conn:: parse_line(){
+http_conn:: HTTP_CODE http_conn:: do_request(){
 
+}
+//解析一行，判断依据 \r\n
+http_conn::  LINE_STATUS  http_conn:: parse_line(){
+    char  temp;
+    for( ; My_check_index < My_read_index ; ++My_check_index ){
+        temp = My_Read_buf[My_check_index];
+        if( temp == '\r'){
+            if( My_check_index + 1 == My_read_index){
+                return LINE_OPEN;       //获取的数据不全
+            }
+            else if( My_Read_buf[My_check_index + 1] == '\n'){
+                //为了那个获取到这一行，即有字符串结束符，将\r\n全部置为 \0
+                My_Read_buf[My_check_index++] = '\0';
+                My_Read_buf[My_check_index++] = '\0';
+                return LINE_OK;
+            }
+            return LINE_BAD;
+        }
+        else if(temp == '\n'){
+            if( My_check_index > 1 && My_Read_buf[My_check_index - 1] == '\r'){
+                My_Read_buf[My_check_index-1] = '\0';
+                My_Read_buf[My_check_index++] = '\0';
+                return LINE_OK;
+            }
+            return LINE_BAD;
+        }
+        //return LINE_OPEN;
+    }
+    return LINE_OK;
 }
 //非阻塞的写
 bool http_conn:: write(){

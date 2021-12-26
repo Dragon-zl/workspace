@@ -43,6 +43,7 @@ int main(int argc , char * argv[]){
     //获取端口号
     int port = atoi(argv[1]);//字符串转整数
 
+    
     //对sigpie信号进行注册处理
     //注册为忽略该信号
     addsig( SIGPIPE , SIG_IGN);
@@ -77,8 +78,8 @@ int main(int argc , char * argv[]){
     //绑定
     struct sockaddr_in addr;
     addr.sin_family = PF_INET;
-    inet_pton( PF_INET , "10.100.90.84" , &addr.sin_addr.s_addr);
-    //addr.sin_addr.s_addr = INADDR_ANY;
+    //inet_pton( PF_INET , "192.168.150.130" , &addr.sin_addr.s_addr);
+    addr.sin_addr.s_addr = INADDR_ANY;
     addr.sin_port = htons( port );
     ret = bind( listenfd , (struct sockaddr *)&addr , sizeof(addr));
     if( -1 == ret ){
@@ -87,6 +88,7 @@ int main(int argc , char * argv[]){
         close(listenfd);
         exit(-1);
     }
+    printf("端口：%d\n" ,port);
     //监听
     listen(listenfd , 5);
     //创建 epoll 对象、监听事件数组，将监听描述符添加到到 epoll实例当中
@@ -113,10 +115,11 @@ int main(int argc , char * argv[]){
                 struct  sockaddr_in  client_addr;
                 socklen_t size = sizeof(client_addr);
                 int connect_fd = accept( listenfd , (struct sockaddr *)&client_addr , &size);
-
+                printf("有客户端连接\n");
                 if( http_conn::My_users_count >= MAX_FD){
                     //目标连接数已满
                     //给客户端发送信息：服务器正忙
+                    printf("目标连接数已满\n");
                     close(connect_fd);
                     continue;
                 }
