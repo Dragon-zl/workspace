@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
-
+#include <errno.h>
 int http_conn::My_epollfd = -1;     
 int http_conn::My_users_count = 0;    
 
@@ -36,7 +36,7 @@ void  removefd_epoll(int epoll , int fd){
 void  modfd_epoll(int epoll , int fd , int ev){
     epoll_event  event;
     event.data.fd = fd;
-    event.events = ev | EPOLLONESHOT;
+    event.events = ev | EPOLLONESHOT | EPOLLRDHUP;
     epoll_ctl( epoll , EPOLL_CTL_MOD , fd , &event);
 }
 
@@ -60,11 +60,94 @@ void http_conn::init(int connect_fd , struct sockaddr_in & client_addr){
     //添加到 epoll 实例当中
     addfd_epoll( My_epollfd , My_sockfd , true);
     My_users_count++;   //总的连接用户数 + 1
+
+    //初始化 某些数据
+    init();
+}
+//初始化 数据
+void http_conn:: init(){
+    My_check_state = CHECK_STATE_REQUESTLINE;
+    My_check_index = 0;
+    My_start_line = 0;
+    My_read_index = 0;
 }
 //非阻塞的读
 bool http_conn:: read(){
-    printf("一次性读出数据\n");
+    //判断读缓冲区是否 已满
+    if( My_read_index >= READ_BUFFER_SIZE ){
+        return false;
+    }
+    //读到的字节
+    int byte_read = 0;
+    while(true){
+        byte_read = recv( My_sockfd , My_Read_buf + My_read_index , READ_BUFFER_SIZE , 0);
+        if( -1 == byte_read ){
+            if( errno == EAGAIN || errno == EWOULDBLOCK){
+                //没有数据
+                break;
+            }
+            return false;
+        }
+        else if( 0 == byte_read){
+            //对方关闭连接
+            return false;
+        }
+        My_read_index += byte_read;
+    }
+    printf("读取到了数据 %s\n" , My_Read_buf );
     return true;
+}
+//解析 HTTP 请求
+http_conn:: HTTP_CODE http_conn:: process_read(){
+    //初始化状态
+    LINE_STATUS  line_status = LINE_OK;
+    HTTP_CODE  ret = NO_REQUEST;
+    char * text = 0;
+    while( ((My_check_state == CHECK_STATE_CONTENT) && (line_status == LINE_OK))
+            || ((line_status = parse_line()) == LINE_OK)){
+                /*进入循环的条件：
+                        解析到了请求体 并且 行状态为 OK
+                        或者
+                        解析到了一行完整的数据
+                */
+                //获取一行数据
+                text = get_line();
+                My_start_line = My_check_index;
+                printf("got  1  http  line : %s\n" , text);
+                
+                switch (My_check_state)
+                {
+                case CHECK_STATE_REQUESTLINE:
+                {
+
+                }
+                    break;
+                case CHECK_STATE_HEADER:
+                {
+
+                }
+                    break;
+                default:
+                    break;
+                }
+
+            }
+}
+//解析请求首行
+http_conn:: HTTP_CODE http_conn:: parse_request_line(char * text){
+
+}
+//解析请求头
+http_conn:: HTTP_CODE http_conn:: parse_headers(char * text){
+
+}
+//解析请求体
+http_conn:: HTTP_CODE http_conn:: parse_content(char * text){
+
+}
+//解析一行
+http_conn::  LINE_STATUS  http_conn:: parse_line(){
+
 }
 //非阻塞的写
 bool http_conn:: write(){

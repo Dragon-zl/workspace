@@ -17,7 +17,15 @@ public:
 
     //初始化新接收的客户端
     void init(int connect_fd , struct sockaddr_in & client_addr);
-    void process();//处理客户端请求
+
+    //非阻塞的读
+    bool read();
+    //非阻塞的写
+    bool write();
+    //关闭连接
+    void close_connect();
+    //由线程池中的工作线程调用，处理客户端请求的入口函数
+    void process();
 };
 
 
