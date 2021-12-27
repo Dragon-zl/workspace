@@ -208,9 +208,14 @@ http_conn:: HTTP_CODE http_conn:: parse_request_line(char * text){
     My_check_state = CHECK_STATE_HEADER;
     return NO_REQUEST;
 }
-//解析请求头
+//解析HTTP请求行的头部信息，
 http_conn:: HTTP_CODE http_conn:: parse_headers(char * text){
-
+    //遇到空行，表示头部字段解析完毕
+    if( text[0] == '\0'){
+        //如果 HTTP 请求有消息体，则还需要读取 m_content 字节的消息体
+        //状态机转移到 CHECK_STATE_CONTENT 状态
+        if( )
+    }
 }
 //解析请求体
 http_conn:: HTTP_CODE http_conn:: parse_content(char * text){
