@@ -123,6 +123,8 @@ int main(int argc , char * argv[]){
                     close(connect_fd);
                     continue;
                 }
+                
+
                 //将 新连接的客户信息初始化，放到数组中
                 //使用文件描述符作为数组索引
                 users[connect_fd].init( connect_fd , client_addr);

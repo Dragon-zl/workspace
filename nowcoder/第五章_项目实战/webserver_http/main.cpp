@@ -26,14 +26,12 @@ void  addsig(int sig , void(handle)(int) ){
     sa.sa_flags = 0;
     sigaction( sig , &sa , NULL);
 }
-
 //添加文件描述符到 epoll 实例中
 extern  void  addfd_epoll(int epoll , int fd , bool one_shot);
 //从epoll实例中删除文件描述符
 extern  void  removefd_epoll(int epoll , int fd);
 //修改 epoll 实例中的文件描述符
 extern  void  modfd_epoll(int epoll , int fd , int ev);
-
 int main(int argc , char * argv[]){
 
     if( argc <= 1){
@@ -43,8 +41,8 @@ int main(int argc , char * argv[]){
     //获取端口号
     int port = atoi(argv[1]);//字符串转整数
 
-    //对sigpie信号进行注册处理
-    //注册为忽略该信号
+    //对sigpie信号进行注册处理  
+    //注册为忽略该信号: 原因：读端全部关闭 ，对管道进行write的进程会收到一个信号 SIGPIPE，通常会导致进程异常终止。
     addsig( SIGPIPE , SIG_IGN);
 
     //创建并初始化线程池
@@ -54,7 +52,7 @@ int main(int argc , char * argv[]){
     }catch(...){
         exit(-1);
     }
-
+    
     //创建一个数组，用于保存所有的客户端信息
     http_conn  *  users = new http_conn[ MAX_FD ];
     
@@ -120,6 +118,10 @@ int main(int argc , char * argv[]){
                     close(connect_fd);
                     continue;
                 }
+                //保存客户端地址信息到日志中
+                char ip[16] = {0};
+                inet_ntop(AF_INET, &client_addr.sin_addr ,ip, sizeof(ip));
+                LOG_INFO("client(%s) is connected", ip);
                 //将 新连接的客户信息初始化，放到数组中
                 //使用文件描述符作为数组索引
                 users[connect_fd].init( connect_fd , client_addr);

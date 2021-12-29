@@ -103,9 +103,11 @@ void http_conn::init()
 
 // 循环读取客户数据，直到无数据可读或者对方关闭连接
 bool http_conn::read() {
+    //判断读缓冲区是否 已满
     if( m_read_idx >= READ_BUFFER_SIZE ) {
         return false;
     }
+    //读到的字节
     int bytes_read = 0;
     while(true) {
         // 从m_read_buf + m_read_idx索引出开始保存数据，大小是READ_BUFFER_SIZE - m_read_idx

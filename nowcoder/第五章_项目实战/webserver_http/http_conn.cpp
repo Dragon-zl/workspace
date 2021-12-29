@@ -89,7 +89,9 @@ bool http_conn:: read(){
     //读到的字节
     int byte_read = 0;
     while(true){
-        byte_read = recv( My_sockfd , My_Read_buf + My_read_index , READ_BUFFER_SIZE , 0);
+        // 从m_read_buf + m_read_idx索引出开始保存数据，大小是READ_BUFFER_SIZE - m_read_idx
+        byte_read = recv( My_sockfd , My_Read_buf + My_read_index , 
+            READ_BUFFER_SIZE - My_read_index, 0);
         if( -1 == byte_read ){
             if( errno == EAGAIN || errno == EWOULDBLOCK){
                 //没有数据
@@ -266,9 +268,11 @@ void http_conn:: process(){
 }
 //关闭连接
 void http_conn:: close_connect(){
-    //将套接字从 epoll实例中哦移除
-    removefd_epoll( My_epollfd , My_sockfd );
-    My_sockfd = -1;
-    //连接用户数 减 1
-    My_users_count--;
+    if( -1 != My_sockfd){
+        //将套接字从 epoll实例中哦移除
+        removefd_epoll( My_epollfd , My_sockfd );
+        My_sockfd = -1;
+        //连接用户数 减 1
+        My_users_count--;
+    }
 }

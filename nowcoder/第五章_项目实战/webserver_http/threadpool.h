@@ -122,7 +122,6 @@ void  threadpool<T> :: run(){
         My_workqueue.pop_front();
         //解锁
         My_queuelocker.unlock();
-
         //判断是否获取成功
         if( !request ){
             continue;

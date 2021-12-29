@@ -33,7 +33,7 @@ int main( int argc, char* argv[] ) {
     //初始化日志
     // Log::get_instance()->init("./ServerLog", 0, 2000, 800000, 800);
     Log::get_instance()->init("./ServerLog", 0, 2000, 800000, 0);
-
+//----------------------------------------------------------------------
     if( argc <= 1 ) {
         printf( "usage: %s port_number\n", basename(argv[0]));
         LOG_ERROR("%s", "epoll failure");
@@ -102,7 +102,7 @@ int main( int argc, char* argv[] ) {
                     close(connfd);
                     continue;
                 }
-
+                //保存客户端地址信息到日志中
                 char ip[16] = {0};
                 inet_ntop(AF_INET, &client_address.sin_addr ,ip, sizeof(ip));
                 LOG_INFO("client(%s) is connected", ip);
@@ -110,7 +110,7 @@ int main( int argc, char* argv[] ) {
                 users[connfd].init( connfd, client_address);
 
             } else if( events[i].events & ( EPOLLRDHUP | EPOLLHUP | EPOLLERR ) ) {
-
+                //客户端异常断开或者错误等事件2222
                 users[sockfd].close_conn();
 
             } else if(events[i].events & EPOLLIN) {
