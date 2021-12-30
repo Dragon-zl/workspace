@@ -6,6 +6,10 @@
 #include <errno.h>
 #include <strings.h>
 #include <string.h>
+#include <stdlib.h>
+#include <sys/mman.h>
+// 网站的根目录
+const char* doc_root = "/home/dzl/My_space/workspace/nowcoder/第五章_项目实战/nowcoder/webserver/resources";
 int http_conn::My_epollfd = -1;     
 int http_conn::My_users_count = 0;    
 
@@ -72,6 +76,7 @@ void http_conn:: init(){
     My_check_index = 0;
     My_start_line = 0;
     My_read_index = 0;
+    My_content_length = 0;
     My_method = GET;
     My_url = NULL;
     My_version = NULL;
@@ -162,7 +167,7 @@ http_conn:: HTTP_CODE http_conn:: process_read(){
                     default:
                     {
                         //return INTERNAL_ERROR;//内部错误
-                        break;
+                        return INTERNAL_ERROR;
                     }
                         
                 }
@@ -176,6 +181,9 @@ http_conn:: HTTP_CODE http_conn:: parse_request_line(char * text){
 
     //GET /index.html HTTP/1.1
     My_url = strpbrk( text , " \t");
+    if( !My_url ){
+        return BAD_REQUEST;
+    }
     //GET\0/index.html HTTP/1.1
     *My_url++ = '\0';
 
@@ -216,15 +224,69 @@ http_conn:: HTTP_CODE http_conn:: parse_headers(char * text){
     if( text[0] == '\0'){
         //如果 HTTP 请求有消息体，则还需要读取 m_content 字节的消息体
         //状态机转移到 CHECK_STATE_CONTENT 状态
-        if( )
+        if (My_content_length != 0 ) {
+            My_check_state = CHECK_STATE_CONTENT;
+            return NO_REQUEST;
+        }
+        // 否则说明我们已经得到了一个完整的HTTP请求
+        return GET_REQUEST;
+    }else if ( strncasecmp( text, "Connection:", 11 ) == 0 ) {
+        // 处理Connection 头部字段  Connection: keep-alive
+        text += 11;
+        text += strspn( text, " \t" );
+        if ( strcasecmp( text, "keep-alive" ) == 0 ) {
+            My_linger = true;
+        }
+    }else if ( strncasecmp( text, "Content-Length:", 15 ) == 0 ) {
+        // 处理Content-Length头部字段
+        text += 15;
+        text += strspn( text, " \t" );
+        My_content_length = atol(text);
+    }else if ( strncasecmp( text, "Host:", 5 ) == 0 ) {
+        // 处理Host头部字段
+        text += 5;
+        text += strspn( text, " \t" );
+        My_host = text;
+    } else {
+        printf( "oop! unknow header %s\n", text );
     }
 }
-//解析请求体
+// 我们没有真正解析HTTP请求的消息体，只是判断它是否被完整的读入了
 http_conn:: HTTP_CODE http_conn:: parse_content(char * text){
-
+    if ( My_read_index >= ( My_content_length + My_check_index ) )
+    {
+        text[ My_content_length ] = '\0';
+        return GET_REQUEST;
+    }
+    return NO_REQUEST;
 }
+// 当得到一个完整、正确的HTTP请求时，我们就分析目标文件的属性，
+// 如果目标文件存在、对所有用户可读，且不是目录，则使用mmap将其
+// 映射到内存地址m_file_address处，并告诉调用者获取文件成功
 http_conn:: HTTP_CODE http_conn:: do_request(){
-
+    //  /home/dzl/workspace/workspace/nowcoder/第五章_项目实战/nowcoder/webserver/resources
+    strcpy( My_real_file, doc_root );
+    int len = strlen( doc_root );
+    strncpy( My_real_file + len, My_url, FILENAME_LEN - len - 1 );
+    // 获取m_real_file文件的相关的状态信息，-1失败，0成功
+    if ( stat( My_real_file, &My_file_stat ) < 0 ) {
+        return NO_RESOURCE;
+    }
+    // 判断访问权限
+    if ( ! ( My_file_stat.st_mode & S_IROTH ) ) {
+        return FORBIDDEN_REQUEST;
+    }
+    // 判断是否是目录
+    if ( S_ISDIR( My_file_stat.st_mode ) ) {
+        return BAD_REQUEST;
+    }
+    // 以只读方式打开文件
+    int fd = open( My_real_file, O_RDONLY );
+    // 创建内存映射
+    My_file_address = ( char* )mmap( 0, My_file_stat.st_size, 
+                                    PROT_READ, MAP_PRIVATE, fd, 0 );
+    close( fd );
+    return FILE_REQUEST;
 }
 //解析一行，判断依据 \r\n
 http_conn::  LINE_STATUS  http_conn:: parse_line(){
@@ -251,9 +313,8 @@ http_conn::  LINE_STATUS  http_conn:: parse_line(){
             }
             return LINE_BAD;
         }
-        //return LINE_OPEN;
     }
-    return LINE_OK;
+    return LINE_OPEN;
 }
 //非阻塞的写
 bool http_conn:: write(){
@@ -262,7 +323,8 @@ bool http_conn:: write(){
 }
 //由线程池中的工作线程调用，处理客户端请求的入口函数
 void http_conn:: process(){
-    //解析 HTTP 请求
+    // 解析HTTP请求
+    HTTP_CODE read_ret = process_read();
     printf("parse  request, create  response\n");
     //生成响应
 }

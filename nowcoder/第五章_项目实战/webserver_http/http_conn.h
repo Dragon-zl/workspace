@@ -2,6 +2,7 @@
 #define HTTP_CONN_H
 
 #include <arpa/inet.h>
+#include <sys/stat.h>
 class http_conn
 {
 public:
@@ -36,6 +37,9 @@ public:
 
     static int My_epollfd;      //所有的 socket 事件，都共享一个 epoll 实例
     static int My_users_count;    //正在连接的用户数量
+
+    // 文件名的最大长度
+    static const int FILENAME_LEN = 200;        
     //读缓冲区，大小
     static const int READ_BUFFER_SIZE  = 2048;
     //写缓冲区，大小
@@ -74,7 +78,8 @@ private:
     char My_Read_buf[READ_BUFFER_SIZE];
     //标识读缓冲区已读的客户端数据的 最后一个字节的下标 + 1
     int My_read_index;
-
+    //HTTP请求的消息总长度
+    int My_content_length; 
     //当前正在分析的字符在读缓冲区的位置
     int My_check_index;
     //当前正在解析的行的起始位置     
@@ -82,8 +87,14 @@ private:
     //主状态机当前所处的状态
     CHECK_STATE  My_check_state;
 
+    // 客户请求的目标文件的完整路径，其内容等于 doc_root + m_url, doc_root是网站根目录
+    char My_real_file[ FILENAME_LEN ];       
     //请求目标文件的文件名
     char * My_url;
+    // 目标文件的状态。通过它我们可以判断文件是否存在、是否为目录、是否可读，并获取文件大小等信息
+    struct stat My_file_stat; 
+    // 客户请求的目标文件被mmap到内存中的起始位置               
+    char* My_file_address;                   
     //协议版本 ， 这里设置只支持 HTTP1.1
     char * My_version;
     //请求方法
