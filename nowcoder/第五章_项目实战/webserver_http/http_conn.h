@@ -56,12 +56,31 @@ public:
     bool write();
     //关闭连接
     void close_connect();
+    // 对内存映射区执行munmap操作
+    void unmap();
     //由线程池中的工作线程调用，处理客户端请求的入口函数
     void process();
     //解析 HTTP 请求
     HTTP_CODE process_read();
+    //根据服务器处理HTTP请求的结果，决定返回给客户端的内容
+    bool process_write(HTTP_CODE);
+    //服务器返回状态行
+    bool add_status_line(int  , const char *);
+    //服务器返回http头
+    bool add_headers(int );
+    //头部信息中的：返回内容长度
+    bool add_content_length(int );
+    //头部信息中的：返回内容文件类型
+    bool add_content_type();
+    //头部信息中的：是否保持连接
+    bool add_linger();
+    //头部信息中的：\r\n
+    bool add_blank_line();
+    bool add_content( const char*  );
     //解析请求首行
     HTTP_CODE parse_request_line(char * text);
+    // 往写缓冲中写入待发送的数据
+    bool add_response(const char* , ...);
     //解析请求头
     HTTP_CODE parse_headers(char * text);
     //解析请求体
@@ -86,6 +105,16 @@ private:
     int My_start_line;
     //主状态机当前所处的状态
     CHECK_STATE  My_check_state;
+
+    char My_write_buf[WRITE_BUFFER_SIZE]; //写缓冲区
+    int My_write_idx;                     //写缓冲区中待发送的字节数
+    
+    struct iovec m_iv[2];                 // 我们将采用writev来执行写操作，所以定义下面两个成员，
+                                            //其中m_iv_count表示被写内存块的数量。
+    int m_iv_count;
+    int bytes_to_send;                  // 将要发送的数据的字节数
+    int bytes_have_send;                // 已经发送的字节数
+
 
     // 客户请求的目标文件的完整路径，其内容等于 doc_root + m_url, doc_root是网站根目录
     char My_real_file[ FILENAME_LEN ];       

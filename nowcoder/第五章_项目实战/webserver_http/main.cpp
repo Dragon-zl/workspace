@@ -50,6 +50,7 @@ int main(int argc , char * argv[]){
     try{
         pool = new threadpool<http_conn>;
     }catch(...){
+        //LOG_ERROR("%s", "create threadpoll failure");
         exit(-1);
     }
     
@@ -75,8 +76,8 @@ int main(int argc , char * argv[]){
     //绑定
     struct sockaddr_in addr;
     addr.sin_family = PF_INET;
-    inet_pton( PF_INET , "10.100.90.84" , &addr.sin_addr.s_addr);
-    //addr.sin_addr.s_addr = INADDR_ANY;
+    //inet_pton( PF_INET , "10.100.90.84" , &addr.sin_addr.s_addr);
+    addr.sin_addr.s_addr = INADDR_ANY;
     addr.sin_port = htons( port );
     ret = bind( listenfd , (struct sockaddr *)&addr , sizeof(addr));
     if( -1 == ret ){
@@ -111,7 +112,10 @@ int main(int argc , char * argv[]){
                 struct  sockaddr_in  client_addr;
                 socklen_t size = sizeof(client_addr);
                 int connect_fd = accept( listenfd , (struct sockaddr *)&client_addr , &size);
-
+                if ( connect_fd < 0 ) {//如果连接失败
+                    printf( "errno is: %d\n", errno );
+                    continue;
+                } 
                 if( http_conn::My_users_count >= MAX_FD){
                     //目标连接数已满
                     //给客户端发送信息：服务器正忙
@@ -121,7 +125,7 @@ int main(int argc , char * argv[]){
                 //保存客户端地址信息到日志中
                 char ip[16] = {0};
                 inet_ntop(AF_INET, &client_addr.sin_addr ,ip, sizeof(ip));
-                LOG_INFO("client(%s) is connected", ip);
+                //LOG_INFO("client(%s) is connected", ip);
                 //将 新连接的客户信息初始化，放到数组中
                 //使用文件描述符作为数组索引
                 users[connect_fd].init( connect_fd , client_addr);

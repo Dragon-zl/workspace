@@ -8,8 +8,24 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <stdarg.h>
+#include <sys/uio.h>
+// 定义HTTP响应的一些状态信息
+const char* ok_200_title    = "OK";
+const char* error_400_title = "Bad Request";
+const char* error_400_form  = "Your request has bad syntax or is inherently impossible to satisfy.\n";
+const char* error_403_title = "Forbidden";
+const char* error_403_form  = "You do not have permission to get file from this server.\n";
+const char* error_404_title = "Not Found";
+const char* error_404_form  = "The requested file was not found on this server.\n";
+
 // 网站的根目录
-const char* doc_root = "/home/dzl/My_space/workspace/nowcoder/第五章_项目实战/nowcoder/webserver/resources";
+const char* doc_root = "/home/dzl/My_space/workspace/nowcoder/第五章_项目实战/webserver_http/resources";
+
+const char* error_500_form  = "There was an unusual problem serving the requested file.\n";
+
+const char* error_500_title = "Internal Error";
+
 int http_conn::My_epollfd = -1;     
 int http_conn::My_users_count = 0;    
 
@@ -42,7 +58,7 @@ void  removefd_epoll(int epoll , int fd){
 void  modfd_epoll(int epoll , int fd , int ev){
     epoll_event  event;
     event.data.fd = fd;
-    event.events = ev | EPOLLONESHOT | EPOLLRDHUP;
+    event.events = ev | EPOLLET | EPOLLONESHOT | EPOLLRDHUP;
     epoll_ctl( epoll , EPOLL_CTL_MOD , fd , &event);
 }
 
@@ -56,6 +72,9 @@ http_conn::~http_conn()
 }
 //初始化新接收的客户端
 void http_conn::init(int connect_fd , struct sockaddr_in & client_addr){
+
+
+
     My_sockfd = connect_fd;
     My_address = client_addr;
 
@@ -72,18 +91,24 @@ void http_conn::init(int connect_fd , struct sockaddr_in & client_addr){
 }
 //初始化 数据
 void http_conn:: init(){
+    bytes_to_send = 0;
+    bytes_have_send = 0;
+    
     My_check_state = CHECK_STATE_REQUESTLINE;
     My_check_index = 0;
     My_start_line = 0;
     My_read_index = 0;
     My_content_length = 0;
     My_method = GET;
-    My_url = NULL;
+    My_url = 0;
     My_version = NULL;
     My_linger - false;
     My_host = NULL;
+    My_write_idx = 0;
     //清空缓冲区
     bzero( My_Read_buf , READ_BUFFER_SIZE);
+    bzero(My_write_buf, READ_BUFFER_SIZE);
+    bzero(My_real_file, FILENAME_LEN);
 }
 //非阻塞的读
 bool http_conn:: read(){
@@ -171,51 +196,49 @@ http_conn:: HTTP_CODE http_conn:: process_read(){
                     }
                         
                 }
-                return NO_REQUEST;
+                
             }
+            return NO_REQUEST;
 }
 //解析HTTP请求行，获取请求方法，目标URL，HTTP版本
 http_conn:: HTTP_CODE http_conn:: parse_request_line(char * text){
 
     //这里最高效的方法是使用正则表达式去解析，这里牛客网使用的是传统的方法
-
-    //GET /index.html HTTP/1.1
-    My_url = strpbrk( text , " \t");
-    if( !My_url ){
+    // GET /index.html HTTP/1.1
+    My_url = strpbrk(text, " \t"); // 判断第二个参数中的字符哪个在text中最先出现
+    if (! My_url) { 
         return BAD_REQUEST;
     }
-    //GET\0/index.html HTTP/1.1
-    *My_url++ = '\0';
-
-    char * method = text;
-    //不区分大小写的字符串比较函数
-    if( strcasecmp(method , "GET") == 0){
+    // GET\0/index.html HTTP/1.1
+    *My_url++ = '\0';    // 置位空字符，字符串结束符
+    char* method = text;
+    if ( strcasecmp(method, "GET") == 0 ) { // 忽略大小写比较
         My_method = GET;
-    }
-    else{
+    } else {
         return BAD_REQUEST;
     }
-    My_version = strpbrk( text , " \t");
-    if( !My_version ){
+    // /index.html HTTP/1.1
+    // 检索字符串 str1 中第一个不在字符串 str2 中出现的字符下标。
+    My_version = strpbrk( My_url, " \t" );
+    if (!My_version) {
         return BAD_REQUEST;
     }
-    //GET /index.html\0HTTP/1.1
     *My_version++ = '\0';
-    if( strcasecmp(My_version , "HTTP/1.1") != 0){
+    if (strcasecmp( My_version, "HTTP/1.1") != 0 ) {
         return BAD_REQUEST;
     }
-    //http://192.168.1.1:10000/index.html
-    //比较My_url前 7 个字符是否 为 "http://"
-    if( strncasecmp( My_url , "http://" , 7) == 0){
+    /**
+     * http://192.168.110.129:10000/index.html
+    */
+    if (strncasecmp(My_url, "http://", 7) == 0 ) {   
         My_url += 7;
-        My_url = strchr( My_url , '/'); //index.html
+        // 在参数 str 所指向的字符串中搜索第一次出现字符 c（一个无符号字符）的位置。
+        My_url = strchr( My_url, '/' );
     }
-
-    if( !My_url || My_url[0] != '/'){
+    if ( !My_url || My_url[0] != '/' ) {
         return BAD_REQUEST;
     }
-    //主状态机的状态改为改为检查请求头
-    My_check_state = CHECK_STATE_HEADER;
+    My_check_state = CHECK_STATE_HEADER; // 检查状态变成检查头
     return NO_REQUEST;
 }
 //解析HTTP请求行的头部信息，
@@ -270,6 +293,7 @@ http_conn:: HTTP_CODE http_conn:: do_request(){
     strncpy( My_real_file + len, My_url, FILENAME_LEN - len - 1 );
     // 获取m_real_file文件的相关的状态信息，-1失败，0成功
     if ( stat( My_real_file, &My_file_stat ) < 0 ) {
+        printf("%s\n" , My_real_file);
         return NO_RESOURCE;
     }
     // 判断访问权限
@@ -318,15 +342,181 @@ http_conn::  LINE_STATUS  http_conn:: parse_line(){
 }
 //非阻塞的写
 bool http_conn:: write(){
-    printf("一次性写入数据\n");
-    return true;
+    int temp = 0;
+    if ( bytes_to_send == 0 ) {
+        // 将要发送的字节为0，这一次响应结束。
+        modfd_epoll( My_epollfd, My_sockfd, EPOLLIN ); 
+        init();
+        return true;
+    }
+    while(1) {
+        // 分散写
+        temp = writev(My_sockfd, m_iv, m_iv_count);
+        if ( temp <= -1 ) {
+            // 如果TCP写缓冲没有空间，则等待下一轮EPOLLOUT事件，虽然在此期间，
+            // 服务器无法立即接收到同一客户的下一个请求，但可以保证连接的完整性。
+            if( errno == EAGAIN ) {
+                modfd_epoll( My_epollfd, My_sockfd, EPOLLOUT );
+                return true;
+            }
+            unmap();
+            return false;
+        }
+
+        bytes_have_send += temp;
+        bytes_to_send -= temp;
+
+        if (bytes_have_send >= m_iv[0].iov_len)
+        {
+            //头已发送完毕
+            m_iv[0].iov_len = 0;
+            m_iv[1].iov_base = My_file_address + (bytes_have_send - My_write_idx);
+            m_iv[1].iov_len = bytes_to_send;
+        }
+        else
+        {
+            m_iv[0].iov_base = My_write_buf + bytes_have_send;
+            m_iv[0].iov_len = m_iv[0].iov_len - temp;
+        }
+
+        if (bytes_to_send <= 0)
+        {
+            // 没有数据要发送了
+            unmap();
+            modfd_epoll( My_epollfd, My_sockfd, EPOLLIN ); 
+
+            if (My_linger)
+            {
+                init();
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+    }
 }
+// 对内存映射区执行munmap操作
+void http_conn::unmap() {
+    if( My_file_address )
+    {
+        munmap( My_file_address, My_file_stat.st_size );
+        My_file_address = 0;
+    }
+}
+
 //由线程池中的工作线程调用，处理客户端请求的入口函数
 void http_conn:: process(){
     // 解析HTTP请求
     HTTP_CODE read_ret = process_read();
     printf("parse  request, create  response\n");
     //生成响应
+    bool write_ret = process_write( read_ret );
+    if ( !write_ret ) {
+        close_connect();
+    }
+    modfd_epoll( My_epollfd, My_sockfd, EPOLLOUT);
+}
+//根据服务器处理HTTP请求的结果，决定返回给客户端的内容
+bool http_conn :: process_write(HTTP_CODE ret){
+    switch (ret)
+    {
+        case INTERNAL_ERROR:    //服务器内部错误
+            //服务器返回 HTTP 请求结果的状态
+            add_status_line( 500, error_500_title );
+            //服务器返回 HTTP 协议请求行头部信息
+            add_headers( strlen( error_500_form ) );   
+            if ( !add_content( error_500_form ) ) {
+                    return false;
+            } 
+            printf("INTERNAL_ERROR\n");
+            break;
+        case BAD_REQUEST:   //客户端请求语法错误
+            add_status_line( 400, error_400_title );
+            add_headers( strlen( error_400_form ) );
+            if ( ! add_content( error_400_form ) ) {
+                return false;
+            }
+            printf("BAD_REQUEST\n");
+            break;
+        case FORBIDDEN_REQUEST: //客户端对资源没有足够的访问权限
+            add_status_line( 403, error_403_title );
+            add_headers(strlen( error_403_form));
+            if ( ! add_content( error_403_form ) ) {
+                return false;
+            }
+            printf("FORBIDDEN_REQUEST\n");
+            break;
+        case NO_RESOURCE:    //服务器没有资源
+            add_status_line( 404, error_404_title );
+            add_headers( strlen( error_404_form ) );
+            if ( ! add_content( error_404_form ) ) {
+                return false;
+            }
+            printf("NO_RESOURCE\n");
+            break;
+        case FILE_REQUEST:  //文件请求，获取文件成功
+            add_status_line(200, ok_200_title );
+            add_headers(My_file_stat.st_size);
+            m_iv[ 0 ].iov_base = My_write_buf;
+            m_iv[ 0 ].iov_len = My_write_idx;
+            m_iv[ 1 ].iov_base = My_file_address;
+            m_iv[ 1 ].iov_len = My_file_stat.st_size;
+            m_iv_count = 2;
+            bytes_to_send = My_write_idx + My_file_stat.st_size;
+            printf("FILE_REQUEST\n");
+            return true;
+        default:
+            return false;
+            break;
+    }
+}
+bool http_conn::add_content( const char* content )
+{
+    return add_response( "%s", content );
+}
+bool http_conn :: add_headers(int content_len){
+    add_content_length(content_len);
+    add_content_type();
+    add_linger();
+    return add_blank_line();
+}
+bool http_conn::add_blank_line()
+{
+    return add_response( "%s", "\r\n" );
+}
+
+bool http_conn::add_linger()
+{
+    return add_response( "Connection: %s\r\n", ( My_linger == true ) ? "keep-alive" : "close" );
+}
+bool http_conn::add_content_length(int content_len) {
+    return add_response( "Content-Length: %d\r\n", content_len );
+}
+bool http_conn::add_content_type() {
+    return add_response("Content-Type:%s\r\n", "text/html");
+}
+
+//服务器返回状态行
+bool http_conn :: add_status_line(int  status, const char * title){
+    return add_response( "%s %d %s\r\n", "HTTP/1.1", status, title );
+}
+// 往写缓冲中写入待发送的数据
+bool http_conn :: add_response(const char* format, ...){
+    if( My_write_idx >= WRITE_BUFFER_SIZE)  //写缓冲区待发送的字节数 >= 写缓冲区大小
+    {
+        return false;
+    }
+    va_list  arg_list;
+    va_start( arg_list , format);
+    int len = vsnprintf(My_write_buf + My_write_idx ,  WRITE_BUFFER_SIZE - 1 - My_write_idx , format , arg_list);
+    if( len >= (WRITE_BUFFER_SIZE - 1 - My_write_idx)){ //如果需要发送的字节数，大于缓冲区空间剩余字节数
+        return false;
+    }
+    My_write_idx += len;
+    va_end(arg_list);
+    return true;
 }
 //关闭连接
 void http_conn:: close_connect(){

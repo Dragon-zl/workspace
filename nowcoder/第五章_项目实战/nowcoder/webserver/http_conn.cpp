@@ -85,7 +85,6 @@ void http_conn::init()
 
     m_check_state = CHECK_STATE_REQUESTLINE;    // 初始状态为检查请求行
     m_linger = false;       // 默认不保持链接  Connection : keep-alive保持连接
-
     m_method = GET;         // 默认请求方式为GET
     m_url = 0;              
     m_version = 0;
@@ -296,7 +295,7 @@ http_conn::HTTP_CODE http_conn::do_request()
     if ( stat( m_real_file, &m_file_stat ) < 0 ) {
         return NO_RESOURCE;
     }
-
+    printf("%s\n" , m_real_file);
     // 判断访问权限
     if ( ! ( m_file_stat.st_mode & S_IROTH ) ) {
         return FORBIDDEN_REQUEST;
