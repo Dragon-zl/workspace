@@ -41,7 +41,7 @@ bool Log::init(const char *file_name, int close_log, int log_buf_size, int split
     m_split_lines = split_lines;
 
     time_t t = time(NULL);
-    struct tm *sys_tm = localtime(&t);
+    struct tm *sys_tm = localtime(&t);//获取实时时间
     struct tm my_tm = *sys_tm;
 
  
@@ -50,6 +50,7 @@ bool Log::init(const char *file_name, int close_log, int log_buf_size, int split
 
     if (p == NULL)
     {
+        //格式化字符串: 文件名
         snprintf(log_full_name, 255, "%d_%02d_%02d_%s", my_tm.tm_year + 1900, my_tm.tm_mon + 1, my_tm.tm_mday, file_name);
     }
     else
