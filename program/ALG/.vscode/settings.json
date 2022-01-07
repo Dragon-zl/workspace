@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "ostream": "c",
+        "string_view": "c",
+        "regex": "c"
+    }
+}
