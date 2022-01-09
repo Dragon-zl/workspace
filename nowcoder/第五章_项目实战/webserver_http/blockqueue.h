@@ -1,11 +1,12 @@
-#ifndef BLOCK_QUEUE_H
-#define BLOCK_QUEUE_H
+#ifndef BLOCKQUEUE_H
+#define BLOCKQUEUE_H
 
 #include <iostream>
+#include <stdlib.h>
+#include <pthread.h>
 #include <sys/time.h>
 #include "locker.h"
 using namespace std;
-
 
 template <class T>
 class  block_queue

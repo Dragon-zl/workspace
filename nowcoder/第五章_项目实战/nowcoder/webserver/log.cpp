@@ -44,7 +44,6 @@ bool Log::init(const char *file_name, int close_log, int log_buf_size, int split
     struct tm *sys_tm = localtime(&t);//获取实时时间
     struct tm my_tm = *sys_tm;
 
- 
     const char *p = strrchr(file_name, '/');
     char log_full_name[256] = {0};
 

@@ -46,6 +46,8 @@
         "streambuf": "c",
         "typeinfo": "c",
         "log.h": "c",
-        "block_queue.h": "c"
+        "block_queue.h": "c",
+        "pthread.h": "c",
+        "blockqueue.h": "c"
     }
 }
