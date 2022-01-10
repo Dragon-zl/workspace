@@ -29,7 +29,7 @@ class  block_queue
             My_mutex.lock();
             //清空用户数组
             if(m_array != NULL){
-                deleet [] m_array;
+                delete [] m_array;
             }
             My_mutex.unlock();
         }

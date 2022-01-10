@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <sys/epoll.h>
 #include <errno.h>
+#include "log.h"
 
 #define  MAX_FD  65535              //最多运行 最大客户端连接并发量
 #define  MAX_EVENT_NUMBER  1000     //监听的事件数的最大值
@@ -36,6 +37,8 @@ int main(int argc , char * argv[]){
 
     if( argc <= 1){
         printf("请按如下格式运行: %s  port_number\n" , basename(argv[0]));
+        LOG_ERROR("%s", "epoll failure");
+        return 1;
     }
 
     //获取端口号
@@ -50,7 +53,7 @@ int main(int argc , char * argv[]){
     try{
         pool = new threadpool<http_conn>;
     }catch(...){
-        //LOG_ERROR("%s", "create threadpoll failure");
+        LOG_ERROR("%s", "create threadpoll failure");
         exit(-1);
     }
     
@@ -125,7 +128,7 @@ int main(int argc , char * argv[]){
                 //保存客户端地址信息到日志中
                 char ip[16] = {0};
                 inet_ntop(AF_INET, &client_addr.sin_addr ,ip, sizeof(ip));
-                //LOG_INFO("client(%s) is connected", ip);
+                LOG_INFO("client(%s) is connected", ip);
                 //将 新连接的客户信息初始化，放到数组中
                 //使用文件描述符作为数组索引
                 users[connect_fd].init( connect_fd , client_addr);
