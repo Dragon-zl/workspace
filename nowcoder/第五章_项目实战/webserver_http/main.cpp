@@ -40,7 +40,9 @@ int main(int argc , char * argv[]){
         LOG_ERROR("%s", "epoll failure");
         return 1;
     }
-
+    //初始化日志
+    Log::get_instance()->init("./ServerLog", 0, 2000, 800000, 0);
+    
     //获取端口号
     int port = atoi(argv[1]);//字符串转整数
 
