@@ -5,7 +5,8 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <sys/time.h>
-#include "locker.h"
+#include "./lock/locker.h"
+
 using namespace std;
 
 template <class T>

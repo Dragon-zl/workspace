@@ -1,5 +1,7 @@
-#include "http_conn.h"
-#include "threadpool.h"
+#include "./http/http_conn.h"
+#include "./threadpool/threadpool.h"
+#include "config.h"
+#include "./log/log.h"
 
 #include <cstdio>
 #include <libgen.h>
@@ -10,7 +12,7 @@
 #include <unistd.h>
 #include <sys/epoll.h>
 #include <errno.h>
-#include "log.h"
+
 
 #define  MAX_FD  65535              //最多运行 最大客户端连接并发量
 #define  MAX_EVENT_NUMBER  1000     //监听的事件数的最大值
@@ -40,11 +42,17 @@ int main(int argc , char * argv[]){
         LOG_ERROR("%s", "epoll failure");
         return 1;
     }
+    //命令行解析
+    Config config;
+    //调用解析函数
+    config.parse_arg(argc , argv);
+
+
     //初始化日志
     Log::get_instance()->init("./ServerLog", 0, 2000, 800000, 0);
     
     //获取端口号
-    int port = atoi(argv[1]);//字符串转整数
+    int port = config.PORT;
 
     //对sigpie信号进行注册处理  
     //注册为忽略该信号: 原因：读端全部关闭 ，对管道进行write的进程会收到一个信号 SIGPIPE，通常会导致进程异常终止。

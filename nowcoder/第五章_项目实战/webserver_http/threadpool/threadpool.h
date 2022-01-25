@@ -1,6 +1,6 @@
 #ifndef THREADPOOL_H
 #define THREADPOOL_H
-#include "locker.h"
+#include "../lock/locker.h"
 
 #include <pthread.h>
 #include <list>

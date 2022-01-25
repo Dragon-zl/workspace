@@ -1,7 +1,7 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include "blockqueue.h"
+#include "../blockqueue.h"
 #include <iostream>
 #include <stdio.h>
 #include <stdbool.h>
