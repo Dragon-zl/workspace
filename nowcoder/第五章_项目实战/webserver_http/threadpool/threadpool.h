@@ -30,14 +30,16 @@ class  threadpool{
         //线程执行函数
         void run();
     public:
-        threadpool(int thread_number = 8 , int max_requests = 10000);
+        threadpool(int actor_model, connection_pool *connPool,
+                   int thread_number = 8 , int max_requests = 10000);
         ~threadpool();
         //添加任务
         bool append( T * );
 };
 
 template <typename T>
-threadpool<T> :: threadpool(int thread_number , int max_requests ) : 
+threadpool<T> :: threadpool(int actor_model, connection_pool *connPool,
+                            int thread_number , int max_requests ) : 
     My_thread_number(thread_number),My_max_requests(max_requests),
     My_stop(false) , My_threads(NULL)
 {

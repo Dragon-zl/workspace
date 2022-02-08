@@ -37,15 +37,21 @@ extern  void  removefd_epoll(int epoll , int fd);
 extern  void  modfd_epoll(int epoll , int fd , int ev);
 int main(int argc , char * argv[]){
 
-    if( argc <= 1){
-        printf("请按如下格式运行: %s  port_number\n" , basename(argv[0]));
-        LOG_ERROR("%s", "epoll failure");
-        return 1;
-    }
+    //需要修改的数据库信息，登陆名，密码，库名
+    string user = "root";
+    string passwod = "root";
+    string databasename = "qgydb";
+
     //命令行解析
     Config config;
     //调用解析函数
     config.parse_arg(argc , argv);
+
+
+
+
+
+
 
 
     //初始化日志

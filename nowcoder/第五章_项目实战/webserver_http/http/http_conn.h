@@ -3,6 +3,7 @@
 
 #include <arpa/inet.h>
 #include <sys/stat.h>
+#include "../mysql/sql_connection_pool.h"
 class http_conn
 {
 public:
@@ -48,6 +49,8 @@ public:
     http_conn(/* args */);
     ~http_conn();
 
+    void initmysql_result(connection_pool * connPool);
+    
     //初始化新接收的客户端
     void init(int connect_fd , struct sockaddr_in & client_addr);
     //非阻塞的读
