@@ -34,7 +34,8 @@ class  threadpool{
                    int thread_number = 8 , int max_requests = 10000);
         ~threadpool();
         //添加任务
-        bool append( T * );
+        bool append( T * ,int);
+        bool append_p(T *request);
 };
 
 template <typename T>
@@ -78,7 +79,7 @@ threadpool<T> :: ~threadpool(){
 
 //添加任务
 template <typename T>
-bool threadpool<T> :: append(T * request){
+bool threadpool<T> :: append(T * request , int state){
     //上锁
     My_queuelocker.lock();
     //判断请求队列是否已满
@@ -87,12 +88,27 @@ bool threadpool<T> :: append(T * request){
         My_queuelocker.unlock();
         return false;
     }
+    request->m_state = state;
     //入队
     My_workqueue.push_back(request);
     //解锁
     My_queuelocker.unlock();
     //信号量 + 1
     My_queuestat.post();
+    return true;
+}
+template <typename T>
+bool threadpool<T>::append_p(T *request)
+{
+    m_queuelocker.lock();
+    if (m_workqueue.size() >= m_max_requests)
+    {
+        m_queuelocker.unlock();
+        return false;
+    }
+    m_workqueue.push_back(request);
+    m_queuelocker.unlock();
+    m_queuestat.post();
     return true;
 }
 //worker 函数

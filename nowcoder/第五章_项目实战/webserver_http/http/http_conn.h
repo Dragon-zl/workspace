@@ -53,8 +53,12 @@ public:
     
     //初始化新接收的客户端
     void init(int connect_fd , struct sockaddr_in & client_addr);
+    //初始化连接,外部调用初始化套接字地址
+    void init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMode,
+                     int close_log, string user, string passwd, string sqlname);
     //非阻塞的读
     bool read();
+    bool read_once();
     //非阻塞的写
     bool write();
     //关闭连接
@@ -91,7 +95,15 @@ public:
     HTTP_CODE do_request();
     //解析一行
     LINE_STATUS  parse_line();
-    
+
+    //将内核事件表注册读事件，ET模式，选择开启EPOLLONESHOT
+    void addfd(int epollfd, int fd, bool one_shot, int TRIGMode);
+    sockaddr_in * get_address(){
+        return &My_address;
+    }
+
+    int improv;
+    int timer_flag;
 private:
     int  My_sockfd;             //该 HTTP 连接的socket
     sockaddr_in  My_address;    //通信的socket地址
@@ -139,7 +151,13 @@ private:
     void init();
     //获取一行的其实位置
     char * get_line(){ return My_Read_buf + My_start_line ;}
-    
+
+    int m_TRIGMode;
+    int m_close_log;
+
+    char sql_user[100];
+    char sql_passwd[100];
+    char sql_name[100];
 };
 
 

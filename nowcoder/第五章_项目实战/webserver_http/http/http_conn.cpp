@@ -36,6 +36,22 @@ void  setnonblocking(int fd){
     int new_flag = old_flag | O_NONBLOCK;
     fcntl( fd , F_SETFL , new_flag);
 }
+//将内核事件表注册读事件，ET模式，选择开启EPOLLONESHOT
+void addfd(int epollfd, int fd, bool one_shot, int TRIGMode)
+{
+    epoll_event event;
+    event.data.fd = fd;
+
+    if (1 == TRIGMode)
+        event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
+    else
+        event.events = EPOLLIN | EPOLLRDHUP;
+
+    if (one_shot)
+        event.events |= EPOLLONESHOT;
+    epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event);
+    setnonblocking(fd);
+}
 //添加文件描述符到 epoll 实例中
 void  addfd_epoll(int epoll , int fd , bool one_shot){
     epoll_event  event;
@@ -136,6 +152,64 @@ void http_conn:: init(){
     bzero(My_write_buf, READ_BUFFER_SIZE);
     bzero(My_real_file, FILENAME_LEN);
 }
+//初始化连接,外部调用初始化套接字地址
+void http_conn::init(int sockfd, const sockaddr_in &addr, char *root, int TRIGMode,
+                     int close_log, string user, string passwd, string sqlname){
+    
+    My_sockfd = sockfd;
+    My_address = addr;
+
+    addfd(My_epollfd, sockfd, true, m_TRIGMode);
+    My_users_count++;
+    //当浏览器出现连接重置时，
+    //可能是网站根目录出错或http响应格式出错或者访问的文件中内容完全为空
+    doc_root = root;
+    m_TRIGMode = TRIGMode;
+    m_close_log = close_log;
+
+    strcpy(sql_user, user.c_str());
+    strcpy(sql_passwd, passwd.c_str());
+    strcpy(sql_name,sqlname.c_str());
+
+    init();
+}
+//循环读取客户端数据，直到无数据可读或对方关闭连接
+//非阻塞 ET工作模式，需要一次性将数据读完
+bool http_conn:: read_once(){
+    if(My_read_index >= READ_BUFFER_SIZE){
+        return false;
+    }
+    int bytes_read = 0;
+    //LT读取数据
+    if(0 == m_TRIGMode){
+        bytes_read = recv(My_sockfd, My_Read_buf + My_read_index, 
+                            READ_BUFFER_SIZE - My_read_index, 0);
+        My_read_index += bytes_read;
+        if(bytes_read <= 0){
+            return false;
+        }
+        return true;
+    }
+    //ET读数据
+    else{
+        while(true){
+            bytes_read = recv(My_sockfd, My_Read_buf + My_read_index, 
+                            READ_BUFFER_SIZE - My_read_index, 0);
+            if(bytes_read == -1){
+                if(errno == EAGAIN || errno == EWOULDBLOCK){
+                    break;
+                }
+                return false;
+            }
+            else if(bytes_read == 0){
+                return false;
+            }
+            My_read_index += bytes_read;
+        }
+        return true;
+    }
+}
+
 //非阻塞的读
 bool http_conn:: read(){
     //判断读缓冲区是否 已满
