@@ -64,7 +64,7 @@ int main(int argc , char * argv[]){
     //注册为忽略该信号: 原因：读端全部关闭 ，对管道进行write的进程会收到一个信号 SIGPIPE，通常会导致进程异常终止。
     addsig( SIGPIPE , SIG_IGN);
 
-    //创建并初始化线程池
+    /* //创建并初始化线程池
     threadpool<http_conn>  * pool = NULL;
     try{
         pool = new threadpool<http_conn>;
@@ -174,5 +174,5 @@ int main(int argc , char * argv[]){
     close(listenfd);
     delete [] users;
     delete [] pool;
-    return 0;
+    return 0; */
 }

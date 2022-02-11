@@ -5,7 +5,7 @@
 #include <sys/epoll.h>
 #include "./http/http_conn.h"
 #include "./threadpool/threadpool.h"
-#include "../timer/lst_timer.h"
+#include "./timer/lst_timer.h"
 using namespace std;
 
 const int MAX_FD = 65536;           //最大文件描述符

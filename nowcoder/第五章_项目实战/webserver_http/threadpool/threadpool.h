@@ -6,6 +6,8 @@
 #include <list>
 #include <exception>
 #include <cstdio>
+#include "../mysql/sql_connection_pool.h"
+
 //线程池类，定义成模板类，为了代码的复用 , 模板参数 T 是任务类
 template <typename T>
 class  threadpool{
@@ -34,7 +36,7 @@ class  threadpool{
                    int thread_number = 8 , int max_requests = 10000);
         ~threadpool();
         //添加任务
-        bool append( T * ,int);
+        bool append(T *request, int state);
         bool append_p(T *request);
 };
 
@@ -100,15 +102,15 @@ bool threadpool<T> :: append(T * request , int state){
 template <typename T>
 bool threadpool<T>::append_p(T *request)
 {
-    m_queuelocker.lock();
-    if (m_workqueue.size() >= m_max_requests)
+    My_queuelocker.lock();
+    if (My_workqueue.size() >= My_max_requests)
     {
-        m_queuelocker.unlock();
+        My_queuelocker.unlock();
         return false;
     }
-    m_workqueue.push_back(request);
-    m_queuelocker.unlock();
-    m_queuestat.post();
+    My_workqueue.push_back(request);
+    My_queuelocker.unlock();
+    My_queuestat.post();
     return true;
 }
 //worker 函数

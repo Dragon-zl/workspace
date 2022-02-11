@@ -174,6 +174,15 @@ void Utils :: addsig(int sig , void(handler)(int), bool restart){
     assert(sigaction(sig , &sa , NULL) != -1);
 }
 
+//信号处理函数
+void Utils::sig_handler(int sig)
+{
+    //为保证函数的可重入性，保留原来的errno
+    int save_errno = errno;
+    int msg = sig;
+    send(u_pipefd[1], (char *)&msg, 1, 0);
+    errno = save_errno;
+}
 //定时器处理任务 : 重新定时以不断触发 SIGALRM 信号
 void Utils :: timer_handler(){
     m_timer_lst.tick(); //定时

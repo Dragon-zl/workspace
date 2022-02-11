@@ -10,6 +10,8 @@
 #include <time.h>
 #include <assert.h>
 #include <unistd.h>
+class util_timer;
+
 struct client_data
 {
     sockaddr_in  address;

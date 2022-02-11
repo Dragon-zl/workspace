@@ -7,7 +7,6 @@
 #include "../log/log.h"
 #include <list>
 #include <stdlib.h>
-
 using namespace std;
 
 
@@ -48,11 +47,12 @@ class connection_pool{
 
 class connectionRAII{
     public:
-        connectionRAII(MYSQL **con , connection_pool * connPool);
+        connectionRAII(MYSQL **con, connection_pool *connPool);
         ~connectionRAII();
 
     private:
         MYSQL * conRAII;
         connection_pool * poolRAII;
 };
+
 #endif
