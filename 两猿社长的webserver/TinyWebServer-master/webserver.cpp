@@ -90,6 +90,8 @@ void WebServer::sql_pool()
     m_connPool = connection_pool::GetInstance();
     m_connPool->init("localhost", m_user, m_passWord, m_databaseName, 3306, m_sql_num, m_close_log);
 
+    
+
     //初始化数据库读取表
     users->initmysql_result(m_connPool);
 }
@@ -381,6 +383,7 @@ void WebServer::eventLoop()
 
     while (!stop_server)
     {
+        printf("正在等待客户端连接\n");
         int number = epoll_wait(m_epollfd, events, MAX_EVENT_NUMBER, -1);
         if (number < 0 && errno != EINTR)
         {

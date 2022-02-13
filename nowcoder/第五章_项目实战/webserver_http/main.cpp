@@ -2,6 +2,7 @@
 #include "./threadpool/threadpool.h"
 #include "config.h"
 #include "./log/log.h"
+#include "webserver.h"
 
 #include <cstdio>
 #include <libgen.h>
@@ -38,22 +39,43 @@ extern  void  modfd_epoll(int epoll , int fd , int ev);
 int main(int argc , char * argv[]){
 
     //需要修改的数据库信息，登陆名，密码，库名
-    string user = "root";
-    string passwod = "root";
-    string databasename = "qgydb";
+    string user = "dzl";
+    string passwod = "19991011qwe";
+    string databasename = "webserverDB";
 
     //命令行解析
     Config config;
     //调用解析函数
     config.parse_arg(argc , argv);
 
+    WebServer  server;
 
+    //初始化
+    server.init(config.PORT, user, passwod, databasename,
+                config.LOGWrite, config.OPT_LINGER, config.TRIGMode,
+                config.sql_num, config.thread_num, config.close_log, 
+                config.actor_model);
 
+    //初始化日志
+    server.log_write();
 
+    //初始化数据库
+    server.sql_pool();
 
+    //初始化线程池
+    server.thread_pool();
 
+    //设置触发模式
+    server.trig_mode();
 
+    //监听
+    server.eventListen();
 
+    //运行
+    server.enentLoop();
+
+    return 0;
+    /*
     //初始化日志
     Log::get_instance()->init("./ServerLog", 0, 2000, 800000, 0);
     
@@ -64,7 +86,7 @@ int main(int argc , char * argv[]){
     //注册为忽略该信号: 原因：读端全部关闭 ，对管道进行write的进程会收到一个信号 SIGPIPE，通常会导致进程异常终止。
     addsig( SIGPIPE , SIG_IGN);
 
-    /* //创建并初始化线程池
+     //创建并初始化线程池
     threadpool<http_conn>  * pool = NULL;
     try{
         pool = new threadpool<http_conn>;
