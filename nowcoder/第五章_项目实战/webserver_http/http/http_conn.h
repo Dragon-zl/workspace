@@ -3,7 +3,7 @@
 
 #include <arpa/inet.h>
 #include <sys/stat.h>
-#include "../mysql/sql_connection_pool.h"
+#include "../CGImysql/sql_connection_pool.h"
 class http_conn
 {
 public:

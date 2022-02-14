@@ -39,9 +39,9 @@ extern  void  modfd_epoll(int epoll , int fd , int ev);
 int main(int argc , char * argv[]){
 
     //需要修改的数据库信息，登陆名，密码，库名
-    string user = "dzl";
-    string passwod = "19991011qwe";
-    string databasename = "webserverDB";
+    string user = "root";
+    string passwod = "19991011qwe#QWE";
+    string databasename = "WebserverDB";
 
     //命令行解析
     Config config;

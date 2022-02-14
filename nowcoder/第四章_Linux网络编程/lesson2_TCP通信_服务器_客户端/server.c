@@ -42,6 +42,7 @@ int main(){
     //4、接收客户端的连接
     struct sockaddr_in client_addr;//用于保存客户端信息
     socklen_t size = sizeof(client_addr);
+    printf("waiti client connect !\n");
     int client_fd = accept( lfd , (struct sockaddr *)&client_addr , &size);
     if( -1 == client_fd ){
         perror("accept:");

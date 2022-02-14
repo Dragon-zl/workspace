@@ -383,7 +383,6 @@ void WebServer::eventLoop()
 
     while (!stop_server)
     {
-        printf("正在等待客户端连接\n");
         int number = epoll_wait(m_epollfd, events, MAX_EVENT_NUMBER, -1);
         if (number < 0 && errno != EINTR)
         {

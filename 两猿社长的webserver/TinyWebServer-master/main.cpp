@@ -23,11 +23,9 @@ int main(int argc, char *argv[])
     //日志
     server.log_write();
 
-    printf("初始化LOG成功\n");
     //数据库
     server.sql_pool();
 
-    printf("初始化SQL成功\n");
     //线程池
     server.thread_pool();
 
@@ -40,6 +38,5 @@ int main(int argc, char *argv[])
     //运行
     server.eventLoop();
 
-    printf("运行结束\n");
     return 0;
 }

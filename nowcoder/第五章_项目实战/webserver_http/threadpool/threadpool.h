@@ -6,7 +6,7 @@
 #include <list>
 #include <exception>
 #include <cstdio>
-#include "../mysql/sql_connection_pool.h"
+#include "../CGImysql/sql_connection_pool.h"
 
 //线程池类，定义成模板类，为了代码的复用 , 模板参数 T 是任务类
 template <typename T>

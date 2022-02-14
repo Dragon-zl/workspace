@@ -11,7 +11,6 @@
 #include <stdarg.h>
 #include <sys/uio.h>
 #include <map>
-#include "../mysql/sql_connection_pool.h"
 #include <mysql/mysql.h>
 
 // 定义HTTP响应的一些状态信息
