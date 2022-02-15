@@ -20,10 +20,10 @@ int main(){
     //协议族
     addr.sin_family = AF_INET;
     //设置IP
-    //inet_pton(AF_INET , "192.168.1.1" , (void *)addr.sin_addr.s_addr); 
+    //inet_pton(AF_INET , "10.100.90.12" , (void *)&addr.sin_addr); 
     addr.sin_addr.s_addr = INADDR_ANY;//也可以 不用宏直接用 0 ，表示使用任意网卡的地址
     //设置端口
-    addr.sin_port = htons(9999);
+    addr.sin_port = htons(5000);
     int ret = bind( lfd , (struct sockaddr *)&addr, sizeof(addr));
     if( -1 == ret ){
         perror("bind:");
