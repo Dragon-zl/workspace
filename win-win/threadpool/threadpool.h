@@ -69,10 +69,10 @@ threadpool<T>::threadpool(int actor_model, connection_pool *connPool,
     }
 }
 template <typename T>
-threadpool<T>::~threadpool(){   //析构函数，清空线程数组
+threadpool<T>::~threadpool(){//析构函数，清空线程数组
     delete[] m_threads;
 } 
-template <typename T>
+template <typename T>   //往工作队列中添加任务
 bool threadpool<T>::append(T *request, int state){
     //加锁
     m_queuelocker.lock();
@@ -86,5 +86,74 @@ bool threadpool<T>::append(T *request, int state){
     m_queuelocker.unlock();//解锁
     m_queuestat.post(); //信号量发送信号给工作线程
     return true;
+}
+template <typename T>
+bool threadpool<T>::append_p(T *request){
+    //加锁
+    m_queuelocker.lock();
+    if(m_workqueue.size() >= m_max_requests){
+        //判断请求队列是否已满
+        m_queuelocker.unlock();
+        return false;
+    }
+    m_workqueue.push_back(request);//入队
+    m_queuelocker.unlock();//解锁
+    m_queuestat.post();//信号量发送信号给工作线程
+    return true;
+}
+template <typename T>   //线程池工作线程
+void * threadpool<T>::worker(void *arg){
+    threadpool *pool = (threadpool *)arg;
+    pool -> run();
+    return pool;
+}
+template <typename T>
+void threadpool<T>::run(){
+    while(true){
+        //信号量，等待任务入队
+        m_queuestat.wait();
+        //上锁
+        m_queuelocker.lock();
+        //判断工作队列是否为空
+        if(m_workqueue.empty()){
+            m_queuelocker.unlock();
+            continue;
+        }
+        //任务出队
+        T * request = m_workqueue.front();
+        m_workqueue.pop_front();
+        m_queuelocker.unlock();//解锁
+        if(!request){
+            continue;
+        }
+        //线程池工作模式：
+        if(1 == m_actor_model){
+            if(0 == request -> m_state){
+                if(request -> read_once()){
+                    request -> improv = 1;
+                    connectionRAII mysqlcon(&request -> mysql,
+                                            m_connPool);
+                    request -> process();
+                }
+                else{
+                    request -> improv = 1;
+                    request -> timer_flag = 1;
+                }
+            }
+            else{
+                if(request -> write()){
+                    request -> improv = 1;
+                }
+                else{
+                    request -> improv = 1;
+                    request -> timer_flag = 1;
+                }
+            }
+        }
+        else{
+            connectionRAII mysqlcon(&request->mysql, m_connPool);
+            request -> process();
+        }
+    }
 }
 #endif
