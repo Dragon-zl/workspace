@@ -22,7 +22,7 @@
 #include <sys/uio.h>
 #include <time.h>
 #include "../log/log.h"
-
+#include "../tcpclient/tcpclient.h"
 class util_timer;
 //该结构体保存客户端信息,连接资源包括客户端套接字地址、文件描述符和定时器
 struct client_data

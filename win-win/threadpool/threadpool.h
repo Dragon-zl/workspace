@@ -39,8 +39,8 @@ private:
 };
 template <typename T>
 threadpool<T>::threadpool(int actor_model, connection_pool *connPool,
-                int thread_number , int max_requests):m_actor_model(actor_model)
-                m_thread_number(thread_number), m_max_requests(max_requests)
+                int thread_number , int max_requests):m_actor_model(actor_model),
+                m_thread_number(thread_number), m_max_requests(max_requests),
                 m_threads(NULL),m_connPool(connPool)
 {
     //错误传入参数判断
@@ -136,6 +136,7 @@ void threadpool<T>::run(){
                     request -> process();
                 }
                 else{
+                    
                     request -> improv = 1;
                     request -> timer_flag = 1;
                 }

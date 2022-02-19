@@ -13,6 +13,7 @@
 #include <sys/epoll.h>
 
 #include "../threadpool/threadpool.h"
+#include "../tcpclient/tcpclient.h"
 
 //最大文件描述符
 const int MAX_FD = 65536;
@@ -55,7 +56,8 @@ public:
 
     int m_pipefd[2];
     int m_epollfd;
-    http_conn *users;
+    
+    TcpClient *users;
 
     //数据库相关
     connection_pool *m_connPool;
@@ -65,7 +67,7 @@ public:
     int m_sql_num;
 
     //线程池相关
-    threadpool<http_conn> *m_pool;
+    threadpool<TcpClient> *m_pool;
     int m_thread_num;
 
     //epoll_event相关
