@@ -126,7 +126,7 @@ void threadpool<T>::run(){
         if(!request){
             continue;
         }
-        //线程池工作模式：
+        //线程池工作模式：reactor 模式 (即线程自己去处理读、写事件的读、写数据)
         if(1 == m_actor_model){
             if(0 == request -> m_state){
                 if(request -> read_once()){
@@ -142,7 +142,7 @@ void threadpool<T>::run(){
                 }
             }
             else{
-                if(request -> write()){
+                if(request -> m_write()){
                     request -> improv = 1;
                 }
                 else{
@@ -151,6 +151,7 @@ void threadpool<T>::run(){
                 }
             }
         }
+        //proactor 模式：主函数处理了读写事件的读数据、写数据，线程只需要处理数据
         else{
             connectionRAII mysqlcon(&request->mysql, m_connPool);
             request -> process();

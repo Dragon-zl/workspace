@@ -45,7 +45,10 @@ private:
         while (m_log_queue->pop(single_log))
         {
             m_mutex.lock();
-            fputs(single_log.c_str(), m_fp);
+            if(0 == fwrite(single_log.c_str(), sizeof(single_log.c_str()), 1, m_fp)) //数据写入文件
+            {
+                printf("Log写入失败\n");
+            }
             m_mutex.unlock();
         }
     }

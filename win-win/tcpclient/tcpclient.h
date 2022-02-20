@@ -29,8 +29,9 @@ public:
             int, int, string user, string passwd, string sqlname);
     void close_client(bool read_close = true);
     void process();
+    bool ClientContinuSendCMD(int sockfd);
     bool read_once();
-    bool write();
+    bool m_write();
     sockaddr_in * get_address(){
         return &m_address;
     }

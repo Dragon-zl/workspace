@@ -370,7 +370,7 @@ void WebServer::dealwithwrite(int sockfd)
     }
     //proactor
     else{
-        if (users[sockfd].write())
+        if (users[sockfd].m_write())
         {
             LOG_INFO("send data to the client(%s)", 
                 inet_ntoa(users[sockfd].get_address()->sin_addr));
@@ -408,7 +408,7 @@ void WebServer::eventLoop(){
                 if (false == flag)
                     continue;
             }
-            //服务器端关闭连接，移除对应的定时器
+            //客户端关闭连接，移除对应的定时器
             else if (events[i].events & 
                     (EPOLLRDHUP | EPOLLHUP | EPOLLERR)){
                 util_timer *timer = users_timer[sockfd].timer;

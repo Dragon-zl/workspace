@@ -21,7 +21,7 @@ void sort_timer_lst :: add_timer(util_timer *timer){
         return;
     }
     if(!head){
-        head = tail = NULL;
+        head = tail = timer;
         return;
     }
     //如果新的定时器超时时间小于当前头部结点

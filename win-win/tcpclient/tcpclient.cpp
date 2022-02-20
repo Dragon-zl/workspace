@@ -42,6 +42,18 @@ int setnonblocking(int fd)
     fcntl(fd, F_SETFL, new_option);
     return old_option;
 }
+// 修改文件描述符，重置socket上的EPOLLONESHOT事件，以确保下一次可读时，EPOLLIN事件能被触发
+void modfd(int epollfd, int fd, int ev, int TRIGMode , bool one_shot) {
+    epoll_event event;
+    event.data.fd = fd;
+    if (1 == TRIGMode)
+        event.events = ev | EPOLLET | EPOLLRDHUP;
+    else
+        event.events = ev | EPOLLRDHUP;
+    if (one_shot)
+        event.events |= EPOLLONESHOT;
+    epoll_ctl( epollfd, EPOLL_CTL_MOD, fd, &event );
+}
 //将内核事件表注册读事件，ET模式，选择开启EPOLLONESHOT
 void addfd(int epollfd, int fd, bool one_shot, int TRIGMode)
 {
@@ -151,12 +163,25 @@ bool TcpClient::read_once(){
     }
 }
 //写 赞为实现
-bool TcpClient::write(){
+bool TcpClient::m_write(){
     return false;
+}
+//命令：客户端可以继续发送数据
+bool TcpClient::ClientContinuSendCMD(int sockfd){
+    char * str = "continue";
+    int len = strlen(str);
+    if( len == write(sockfd,  str, len)){
+        return true;
+    }
+    else{
+        return false;
+    }
 }
 //处理读取到的数据
 void TcpClient::process(){
+    
     string str_recvdata = m_read_buf;
+    
     if(fd == NULL){
         //上传文件的协议，接受到文件名
         if (str_recvdata.find("Filename:") != string::npos)
@@ -174,13 +199,19 @@ void TcpClient::process(){
         fd = NULL;
     }
     else{
-        printf("传输一次\n");
-        if(0 == fwrite(m_read_buf, sizeof(m_read_buf), 1, fd)) //数据写入文件
-        {
+        if(fputs(str_recvdata.c_str(), fd) < 0){
             printf("写入失败\n");
+        }
+        else{
         }
         fflush(fd);
     }
     m_read_idx = 0;
     memset(m_read_buf, '\0', READ_BUFFER_SIZE); //清空接受缓冲区
+    //因为默认使用了 EPOLLONESHOT ，重置socket上的EPOLLONESHOT事件
+    modfd(m_epollfd, m_sockfd, EPOLLIN ,m_TRIGMode, true);
+    //给客户端发送继续命令
+    if(!ClientContinuSendCMD(m_sockfd)){
+        printf("发送传输命令失败\n");
+    }
 }

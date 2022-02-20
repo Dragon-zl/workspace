@@ -141,7 +141,10 @@ void Log::write_log(int level, const char *format, ...)
     else
     {   //同步写入日志，将写入内容通过文件描述符写入文件
         m_mutex.lock();
-        fputs(log_str.c_str(), m_fp);
+        if(0 == fwrite(log_str.c_str(), sizeof(log_str.c_str()), 1, m_fp)) //数据写入文件
+        {
+            printf("Log写入失败\n");
+        }
         m_mutex.unlock();
     }
     va_end(valst);
