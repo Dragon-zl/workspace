@@ -177,7 +177,7 @@ bool TcpClient::ClientContinuSendCMD(int sockfd){
         return false;
     }
 }
-//处理读取到的数据
+//处理读到的数据
 void TcpClient::process(){
     
     string str_recvdata = m_read_buf;
@@ -199,6 +199,7 @@ void TcpClient::process(){
         fd = NULL;
     }
     else{
+	//cout << str_recvdata << endl;
         if(fputs(str_recvdata.c_str(), fd) < 0){
             printf("写入失败\n");
         }
