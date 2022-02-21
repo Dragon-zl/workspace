@@ -38,8 +38,7 @@ void TcpClient::initmysql_result(connection_pool *connPool)
 int setnonblocking(int fd)
 {
     int old_option = fcntl(fd, F_GETFL);
-    int new_option = old_option | O_NONBLOCK;
-    fcntl(fd, F_SETFL, new_option);
+    int new_option = old_option | O_NONBLOCK;    fcntl(fd, F_SETFL, new_option);
     return old_option;
 }
 // 修改文件描述符，重置socket上的EPOLLONESHOT事件，以确保下一次可读时，EPOLLIN事件能被触发
@@ -71,8 +70,7 @@ void addfd(int epollfd, int fd, bool one_shot, int TRIGMode)
 }
 //初始化连接，外部调用初始化套接字地址
 void TcpClient::init(int sockfd, const sockaddr_in &addr,
-                        char *root, int TRIGMode, int close_log,
-                        string user, string passwd, string sqlname)
+                        char *root, int TRIGMode, int close_log,                        string user, string passwd, string sqlname)
 {
     m_sockfd = sockfd;
     m_address = addr;
@@ -116,8 +114,7 @@ void TcpClient::init(){
     timer_flag = 0;//超时flag默认为0
     improv = 0;
 
-    memset(m_read_buf, '\0', READ_BUFFER_SIZE);
-    memset(m_write_buf, '\0', WRITE_BUFFER_SIZE);
+    memset(m_read_buf, '\0', READ_BUFFER_SIZE);    memset(m_write_buf, '\0', WRITE_BUFFER_SIZE);
     memset(m_real_file, '\0', FILENAME_LEN);
 }
 
@@ -154,8 +151,7 @@ bool TcpClient::read_once(){
                 return false;
             }
             else if (bytes_read == 0)
-            {
-                return false;
+            {                return false;
             }
             m_read_idx += bytes_read;
         }
@@ -163,25 +159,14 @@ bool TcpClient::read_once(){
     }
 }
 //写 赞为实现
-bool TcpClient::m_write(){
+bool TcpClient::write(){
     return false;
 }
-//命令：客户端可以继续发送数据
-bool TcpClient::ClientContinuSendCMD(int sockfd){
-    char * str = "continue";
-    int len = strlen(str);
-    if( len == write(sockfd,  str, len)){
-        return true;
-    }
-    else{
-        return false;
-    }
-}
-//处理读到的数据
+//处理读取到的数据
 void TcpClient::process(){
     
     string str_recvdata = m_read_buf;
-    
+    //cout << str_recvdata << endl;
     if(fd == NULL){
         //上传文件的协议，接受到文件名
         if (str_recvdata.find("Filename:") != string::npos)
@@ -190,39 +175,25 @@ void TcpClient::process(){
             str_recvdata = str_recvdata.substr(9);
             string file_path = "./";
             file_path = file_path + str_recvdata;
-
-            //检查调用进程是否可以对指定的文件执行某种操作
-            if(access(file_path.c_str(), F_OK) == 0){  //F_OK      测试文件是否存在
-                //表示文件存在
-                fd = fopen(file_path.c_str(),"w");
-                //创建一个用于写入的空文件。如果文件名称与已存在的文件相同，则会删除已有文件的内容，文件被视为一个新的空文件。
-            }
-            else{
-                fd = fopen(file_path.c_str() , "a");
-                //追加到一个文件。写操作向文件末尾追加数据。如果文件不存在，则创建文件。
-            }
+            fd = fopen(file_path.c_str() , "a");//追加文件，没有则创建
         }
     }
-    else if (str_recvdata.find("over") != string::npos){
+    else if (str_recvdata.find("结束") != string::npos){
+        printf("关闭文件描述符\n");
         fflush(fd);
         fclose(fd);
         fd = NULL;
     }
     else{
-	//cout << str_recvdata << endl;
-        if(fputs(str_recvdata.c_str(), fd) < 0){
+        if(fputs(m_read_buf, fd) < 0){
             printf("写入失败\n");
         }
         else{
+            printf("写入%d个字符: %s\n", m_read_idx, m_read_buf);
         }
         fflush(fd);
     }
     m_read_idx = 0;
-    memset(m_read_buf, '\0', READ_BUFFER_SIZE); //清空接受缓冲区
-    //因为默认使用了 EPOLLONESHOT ，重置socket上的EPOLLONESHOT事件
+    memset(m_read_buf, '\0', READ_BUFFER_SIZE); //清空接受缓冲区    //因为默认使用了 EPOLLONESHOT ，重置socket上的EPOLLONESHOT事件
     modfd(m_epollfd, m_sockfd, EPOLLIN ,m_TRIGMode, true);
-    //给客户端发送继续命令
-    if(!ClientContinuSendCMD(m_sockfd)){
-        printf("发送传输命令失败\n");
-    }
 }

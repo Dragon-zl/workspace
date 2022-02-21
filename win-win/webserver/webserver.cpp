@@ -122,7 +122,8 @@ void WebServer::eventListen(){
     struct sockaddr_in address;
     bzero(&address, sizeof(address));
     address.sin_family = AF_INET;
-    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    inet_pton(AF_INET , "192.168.146.128" , (void *)&address.sin_addr);
+    //address.sin_addr.s_addr = htonl(INADDR_ANY);
     address.sin_port = htons(m_port);
     //设置端口复用
     int flag = 1;

@@ -20,7 +20,7 @@ const int MAX_FD = 65536;
 //最大事件数
 const int MAX_EVENT_NUMBER = 10000;
 //最小超时单位
-const int TIMESLOT = 5;
+const int TIMESLOT = 60;
 
 class WebServer
 {
