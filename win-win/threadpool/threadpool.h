@@ -128,6 +128,7 @@ void threadpool<T>::run(){
         }
         //线程池工作模式：reactor 模式 (即线程自己去处理读、写事件的读、写数据)
         if(1 == m_actor_model){
+            //读事件
             if(0 == request -> m_state){
                 if(request -> read_once()){
                     request -> improv = 1;
@@ -141,6 +142,7 @@ void threadpool<T>::run(){
                     request -> timer_flag = 1;
                 }
             }
+            //写事件
             else{
                 if(request -> m_write()){
                     request -> improv = 1;

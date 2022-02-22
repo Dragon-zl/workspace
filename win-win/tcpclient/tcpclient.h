@@ -17,7 +17,8 @@ public:
     static const int WRITE_BUFFER_SIZE = 1024;
     enum METHOD
     {
-        GET = 0,//获取
+        DEFAULT = 0,//默认状态
+        GET,//获取
         POST    //上传
     };
 
@@ -32,6 +33,7 @@ public:
     bool ClientContinuSendCMD(int sockfd);
     bool read_once();
     bool m_write();
+    void GetClientState();
     sockaddr_in * get_address(){
         return &m_address;
     }
@@ -46,6 +48,8 @@ public:
     int m_state; //读为0, 写为1
 private:
     void init();
+    bool StateVerifyCMD(int sockfd);
+    void ClientPOST();
     int m_sockfd;
     int m_read_idx;//读取数据时：当前指针索引
     sockaddr_in m_address;

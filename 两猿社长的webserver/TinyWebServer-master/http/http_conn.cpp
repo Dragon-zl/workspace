@@ -698,5 +698,6 @@ void http_conn::process()
     {
         close_conn();
     }
+    //注册epollout事件。服务器主线程检测写事件，并调用http_conn::write函数将响应报文发送给浏览器端
     modfd(m_epollfd, m_sockfd, EPOLLOUT, m_TRIGMode);
 }

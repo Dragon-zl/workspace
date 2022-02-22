@@ -101,7 +101,7 @@ void TcpClient::init(){
     bytes_have_send = 0;
     //m_check_state = CHECK_STATE_REQUESTLINE;
     m_linger = false;
-    m_method = POST;//默认为上传文件
+    m_method = DEFAULT;
     //m_url = 0;
     //m_version = 0;
     //m_content_length = 0;
@@ -177,52 +177,90 @@ bool TcpClient::ClientContinuSendCMD(int sockfd){
         return false;
     }
 }
-//处理读到的数据
-void TcpClient::process(){
-    
-    string str_recvdata = m_read_buf;
-    
-    if(fd == NULL){
-        //上传文件的协议，接受到文件名
-        if (str_recvdata.find("Filename:") != string::npos)
-        {
-            //找到了
-            str_recvdata = str_recvdata.substr(9);
-            string file_path = "./";
-            file_path = file_path + str_recvdata;
-
-            //检查调用进程是否可以对指定的文件执行某种操作
-            if(access(file_path.c_str(), F_OK) == 0){  //F_OK      测试文件是否存在
-                //表示文件存在
-                fd = fopen(file_path.c_str(),"w");
-                //创建一个用于写入的空文件。如果文件名称与已存在的文件相同，则会删除已有文件的内容，文件被视为一个新的空文件。
-            }
-            else{
-                fd = fopen(file_path.c_str() , "a");
-                //追加到一个文件。写操作向文件末尾追加数据。如果文件不存在，则创建文件。
-            }
-        }
+//Client请求状态验证成功，Server返回的CMD
+bool TcpClient::StateVerifyCMD(int sockfd){
+    char * str = "StateVerify";
+    int len = strlen(str);
+    if( len == write(sockfd,  str, len)){
+        return true;
     }
-    else if (str_recvdata.find("over") != string::npos){
+    else{
+        return false;
+    }
+}
+//获取客户端的请求状态
+void TcpClient::GetClientState()
+{
+    string str_recvdata = m_read_buf;
+    if(str_recvdata.find("Post:Filename:") != string::npos)
+    {
+        //判断为POST
+        m_method = POST;
+        //找到了
+        str_recvdata = str_recvdata.substr(14);
+        string file_path = "./";
+        file_path = file_path + str_recvdata;
+
+        //检查调用进程是否可以对指定的文件执行某种操作
+        if(access(file_path.c_str(), F_OK) == 0){  //F_OK      测试文件是否存在
+            //表示文件存在
+            fd = fopen(file_path.c_str(),"w");
+            //创建一个用于写入的空文件。如果文件名称与已存在的文件相同，则会删除已有文件的内容，文件被视为一个新的空文件。
+        }
+        else{
+            fd = fopen(file_path.c_str() , "a");
+            //追加到一个文件。写操作向文件末尾追加数据。如果文件不存在，则创建文件。
+        }
+        //状态验证成功CMD
+        StateVerifyCMD(m_sockfd);
+    }
+    else if(str_recvdata.find("GET:Filename") != string::npos)
+    {
+        //判断为GET
+        m_method = GET;
+    }
+}
+//处理 POST 请求
+void TcpClient::ClientPOST(){
+    string str_recvdata = m_read_buf;
+    if (str_recvdata.find("over") != string::npos){
         fflush(fd);
         fclose(fd);
         fd = NULL;
+        m_method = DEFAULT;
     }
     else{
-	//cout << str_recvdata << endl;
+	    //cout << str_recvdata << endl;
         if(fputs(str_recvdata.c_str(), fd) < 0){
             printf("写入失败\n");
         }
         else{
         }
         fflush(fd);
+        //给客户端发送继续命令
+        if(!ClientContinuSendCMD(m_sockfd)){
+            printf("发送传输命令失败\n");
+        }
+    }
+}
+//处理读到的数据
+void TcpClient::process(){
+    switch (m_method)
+    {
+    case DEFAULT:
+        GetClientState();//获取客户端的请求状态
+        break;
+    case POST:
+        ClientPOST();//POST模式下的程序
+        break;
+    case GET:
+        ;
+        break;
+    default:
+        break;
     }
     m_read_idx = 0;
     memset(m_read_buf, '\0', READ_BUFFER_SIZE); //清空接受缓冲区
     //因为默认使用了 EPOLLONESHOT ，重置socket上的EPOLLONESHOT事件
     modfd(m_epollfd, m_sockfd, EPOLLIN ,m_TRIGMode, true);
-    //给客户端发送继续命令
-    if(!ClientContinuSendCMD(m_sockfd)){
-        printf("发送传输命令失败\n");
-    }
 }

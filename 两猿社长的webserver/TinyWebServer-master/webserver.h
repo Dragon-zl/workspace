@@ -13,7 +13,7 @@
 #include <sys/epoll.h>
 
 #include "./threadpool/threadpool.h"
-//include "./http/http_conn.h"
+#include "./http/http_conn.h"
 #include "../timer/lst_timer.h"
 
 const int MAX_FD = 65536;           //最大文件描述符
