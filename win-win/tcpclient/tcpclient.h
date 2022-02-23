@@ -48,9 +48,14 @@ public:
     int m_state; //读为0, 写为1
 private:
     void init();
-    bool StateVerifyCMD(int sockfd);
+	void unmap();
+	char * m_fileaddress;
+    int m_write_idx;
+	int write_file_size;
+	bool StateVerifyCMD(int sockfd,const char * cmd);
     void ClientPOST();
-    int m_sockfd;
+    void ClientGET();
+	int m_sockfd;
     int m_read_idx;//读取数据时：当前指针索引
     sockaddr_in m_address;
     FILE * fd;
@@ -60,6 +65,7 @@ private:
     int m_close_log;
     bool m_linger;
     METHOD m_method;
+	struct stat m_file_stat;
     int bytes_to_send;
     int bytes_have_send;
     char sql_user[100];

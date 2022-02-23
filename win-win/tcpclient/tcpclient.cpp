@@ -111,11 +111,12 @@ void TcpClient::init(){
     m_read_idx = 0;
     //m_write_idx = 0;
     //cgi = 0;
-
+	m_write_idx = 0;
+ 	write_file_size = 0;
     m_state = 0;//默认状态为: 读取客户读写入的数据
     timer_flag = 0;//超时flag默认为0
     improv = 0;
-
+	m_fileaddress = NULL;
     memset(m_read_buf, '\0', READ_BUFFER_SIZE);
     memset(m_write_buf, '\0', WRITE_BUFFER_SIZE);
     memset(m_real_file, '\0', FILENAME_LEN);
@@ -178,10 +179,9 @@ bool TcpClient::ClientContinuSendCMD(int sockfd){
     }
 }
 //Client请求状态验证成功，Server返回的CMD
-bool TcpClient::StateVerifyCMD(int sockfd){
-    char * str = "StateVerify";
-    int len = strlen(str);
-    if( len == write(sockfd,  str, len)){
+bool TcpClient::StateVerifyCMD(int sockfd,const char * cmd){
+    int len = strlen(cmd);
+    if( len == write(sockfd, cmd, len)){
         return true;
     }
     else{
@@ -212,13 +212,45 @@ void TcpClient::GetClientState()
             //追加到一个文件。写操作向文件末尾追加数据。如果文件不存在，则创建文件。
         }
         //状态验证成功CMD
-        StateVerifyCMD(m_sockfd);
+        StateVerifyCMD(m_sockfd, "StateVerify");
     }
-    else if(str_recvdata.find("GET:Filename") != string::npos)
+    else if(str_recvdata.find("GET:Filename:") != string::npos)
     {
         //判断为GET
         m_method = GET;
+		//截取掉 GET:Filename
+		str_recvdata = str_recvdata.substr(13);
+		string file_path = "./";
+		file_path += str_recvdata;//获得文件的绝对路径
+		//判断文件是否存在
+		if(access(file_path.c_str(), F_OK) == 0){
+			//获取文件属性
+			stat(file_path.c_str(), &m_file_stat);
+	    	//保存文件大小
+			write_file_size = m_file_stat.st_size;
+			if(write_file_size > 0){
+				//文件有内容
+				//打开文件
+				int fd = open(file_path.c_str(), O_RDONLY);
+				//将文件进行映射
+				m_fileaddress = (char *)mmap(0, m_file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+				//写入时的当前索引 = 0
+				m_write_idx = 0;			
+				close(fd);
+				//发送确认GET命令,附带文件大小
+				StateVerifyCMD(m_sockfd, "StateVerify");
+			}
+		}
     }
+}
+//解除映射
+void TcpClient::unmap(){
+	if(m_fileaddress){
+		//解除映射
+		munmap(m_fileaddress, write_file_size);
+		m_fileaddress = NULL;
+		m_write_idx = 0;
+	}
 }
 //处理 POST 请求
 void TcpClient::ClientPOST(){
@@ -243,6 +275,30 @@ void TcpClient::ClientPOST(){
         }
     }
 }
+//处理 GET 请求
+void TcpClient::ClientGET(){
+	string str_recvdata = m_read_buf;
+	if(str_recvdata.find("continue") != string::npos){
+		//可以发送的数据长度
+		int len = write_file_size - m_write_idx;
+		if(len >= 1024){	//可发送文件数据大于1024
+			len = write(m_sockfd, m_fileaddress + m_write_idx , 1024);
+			m_write_idx += 1024;
+		}
+		else if(len > 0){//最后一包文件数据
+			len = write(m_sockfd, m_fileaddress + m_write_idx , len);
+			m_write_idx = write_file_size;
+		}
+		else{		//无数据，发送结束命令 over
+			char * str = "over";
+			len = write(m_sockfd, str, strlen(str));
+			//解除映射
+			unmap();
+			//客户端状态设置为 DEFAULT
+			m_method = DEFAULT;
+		}
+	}
+}
 //处理读到的数据
 void TcpClient::process(){
     switch (m_method)
@@ -254,7 +310,7 @@ void TcpClient::process(){
         ClientPOST();//POST模式下的程序
         break;
     case GET:
-        ;
+        ClientGET();//GET模式下的 函数
         break;
     default:
         break;
