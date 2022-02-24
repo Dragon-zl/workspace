@@ -430,9 +430,11 @@ http_conn::HTTP_CODE http_conn::do_request()
             strcat(sql_insert, password);
             strcat(sql_insert, "')");
 
+            //users.find(name) == users.end() 即 注册使用的用户名 在已有的库中 不存在
             if (users.find(name) == users.end())
             {
                 m_lock.lock();
+                //注册的用户名和密码插入数据库
                 int res = mysql_query(mysql, sql_insert);
                 users.insert(pair<string, string>(name, password));
                 m_lock.unlock();
@@ -442,7 +444,7 @@ http_conn::HTTP_CODE http_conn::do_request()
                 else
                     strcpy(m_url, "/registerError.html");
             }
-            else
+            else 
                 strcpy(m_url, "/registerError.html");
         }
         //如果是登录，直接判断

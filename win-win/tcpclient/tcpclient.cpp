@@ -16,7 +16,7 @@ void TcpClient::initmysql_result(connection_pool *connPool)
     connectionRAII mysqlcon(&mysql, connPool);
 
     //在user表中检索username，passwd数据，浏览器端输入
-    if (mysql_query(mysql, "SELECT username,passwd FROM user"))
+    /* if (mysql_query(mysql, "SELECT username,passwd FROM user"))
     {
         //LOG_ERROR("SELECT error:%s\n", mysql_error(mysql));
     }
@@ -32,7 +32,7 @@ void TcpClient::initmysql_result(connection_pool *connPool)
         string temp1(row[0]);
         string temp2(row[1]);
         users[temp1] = temp2;
-    }
+    } */
 }
 //队文件描述设置非阻塞
 int setnonblocking(int fd)
@@ -192,6 +192,7 @@ bool TcpClient::StateVerifyCMD(int sockfd,const char * cmd){
 void TcpClient::GetClientState()
 {
     string str_recvdata = m_read_buf;
+    //判断是否为 Post
     if(str_recvdata.find("Post:Filename:") != string::npos)
     {
         //判断为POST
@@ -214,6 +215,7 @@ void TcpClient::GetClientState()
         //状态验证成功CMD
         StateVerifyCMD(m_sockfd, "StateVerify");
     }
+    //判断是否为 GET
     else if(str_recvdata.find("GET:Filename:") != string::npos)
     {
         //判断为GET
@@ -241,6 +243,44 @@ void TcpClient::GetClientState()
 				StateVerifyCMD(m_sockfd, "StateVerify");
 			}
 		}
+    }
+    //判断是否为 mysql insert
+    else if (str_recvdata.find("MySQL:Insert:") != string::npos)
+    {
+        //截取出数据
+        str_recvdata = str_recvdata.substr(13);
+        //调用相关的函数，进行处理
+        //CGIMysqlInertLine();
+        //若成功，返回结果
+        StateVerifyCMD(m_sockfd, "Finish");
+    }
+    //判断是否为 mysql query
+    else if (str_recvdata.find("MySQL:Query:") != string::npos)
+    {
+        //截取出 主键: 条码
+        str_recvdata = str_recvdata.substr(12);
+        //调用相关函数
+
+        //若成功, 返回条码 + 查询到的数据
+        StateVerifyCMD(m_sockfd, str_recvdata.c_str());
+    }
+}
+//调用数据库，插入一行数据
+bool TcpClient::CGIMysqlInertLine(){
+    char * sql_insert = (char *)malloc(sizeof(char) * 200);
+    //解析传入的插入数据
+    //上锁
+    m_lock.lock();
+    //插入数据库
+    int res = mysql_query(mysql, sql_insert);
+    //解锁
+    m_lock.unlock();
+    //判断是否插入成功
+    if(!res){
+        return true;
+    }
+    else{
+        return false;
     }
 }
 //解除映射

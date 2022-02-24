@@ -86,8 +86,10 @@ void WebServer::log_write(){
 void WebServer::sql_pool(){
     //初始化数据库连接池
     m_connPool = connection_pool::GetInstance();
+    //创建 m_sql_num 个数据库对象
     m_connPool->init("localhost", m_user, m_passWord, m_databaseName, 3306, m_sql_num, m_close_log);
-    //初始化数据库读取表
+    
+    //初始化数据库读取表，将表中的数据 用map数组存储起来
     users->initmysql_result(m_connPool);
 }
 //线程池初始化

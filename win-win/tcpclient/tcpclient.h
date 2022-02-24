@@ -49,7 +49,8 @@ public:
 private:
     void init();
 	void unmap();
-	char * m_fileaddress;
+    bool CGIMysqlInertLine();
+    char *m_fileaddress;
     int m_write_idx;
 	int write_file_size;
 	bool StateVerifyCMD(int sockfd,const char * cmd);
