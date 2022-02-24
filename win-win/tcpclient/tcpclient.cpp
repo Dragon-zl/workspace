@@ -249,10 +249,20 @@ void TcpClient::GetClientState()
     {
         //截取出数据
         str_recvdata = str_recvdata.substr(13);
+        
         //调用相关的函数，进行处理
-        //CGIMysqlInertLine();
-        //若成功，返回结果
-        StateVerifyCMD(m_sockfd, "Finish");
+        if(CGIMysqlInertLine(str_recvdata)){
+            //若成功，返回结果
+             
+            if(StateVerifyCMD(m_sockfd, "Finish")){
+            }
+            else{
+            }
+        }
+        else{
+            StateVerifyCMD(m_sockfd, "fail");
+        }
+        
     }
     //判断是否为 mysql query
     else if (str_recvdata.find("MySQL:Query:") != string::npos)
@@ -266,13 +276,20 @@ void TcpClient::GetClientState()
     }
 }
 //调用数据库，插入一行数据
-bool TcpClient::CGIMysqlInertLine(){
-    char * sql_insert = (char *)malloc(sizeof(char) * 200);
-    //解析传入的插入数据
+bool TcpClient::CGIMysqlInertLine(string ClientData){
+    /*
+    INSERT LOW PRIORITY INTO 
+    pcba(barcode,date,status,pat_1,pat_2,pat_3) VALUES( 值1 ， 值2 ， 值3 , ···) ；
+    */
+    string sql_insert = "INSERT INTO pcba(barcode,date,status,pat_1,pat_2,pat_3) VALUES(";
+    
+    sql_insert += ( ClientData + ")");
+
+
     //上锁
     m_lock.lock();
     //插入数据库
-    int res = mysql_query(mysql, sql_insert);
+    int res = mysql_query(mysql, sql_insert.c_str());
     //解锁
     m_lock.unlock();
     //判断是否插入成功
