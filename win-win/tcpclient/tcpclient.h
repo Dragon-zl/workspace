@@ -50,6 +50,7 @@ private:
     void init();
 	void unmap();
     bool CGIMysqlInertLine(string ClientData);
+    bool CGIMysqlQueryLine(string& barcode);
     char *m_fileaddress;
     int m_write_idx;
 	int write_file_size;
