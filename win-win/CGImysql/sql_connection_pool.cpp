@@ -37,8 +37,8 @@ void connection_pool::init(string ip, string User, string PassWord,
         //分配初始化与mysql_real_connect()相适应的MySQL对象
         con = mysql_init(con);
         if(NULL == con){
-            LOG_ERROR("MySQL Error");
-			exit(1);
+            LOG_ERROR("MySQL mysql_init(Out of memory)");
+            exit(1);
         }
         //连接数据库引擎
         con = mysql_real_connect(con, ip.c_str(), User.c_str(),

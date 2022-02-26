@@ -281,15 +281,23 @@ bool TcpClient::CGIMysqlQueryLine(string& barcode)
 {
     string sql_query = "SELECT * FROM pcba WHERE barcode = '" + barcode + "'";
     //执行插叙语句
+    barcode = "";
     //上锁
     m_lock.lock();
+    //计算起始时间
+    int rc;
+    struct timespec ts_start, ts_end;
+    rc = clock_gettime(CLOCK_MONOTONIC, &ts_start);
     if (mysql && !mysql_query(mysql, sql_query.c_str())) //mysql_query 只能检查语法错误，不能返回真实结果
     {
         //获取检索完整的结果集
         MYSQL_RES * result = mysql_store_result(mysql);
         //获取检索结果的一行
         MYSQL_ROW row = mysql_fetch_row(result);
-        barcode = "";
+        //计算mysql检索结束后的时间
+        rc = clock_gettime(CLOCK_MONOTONIC, &ts_end);
+        printf("mysql_query reports %ld.%09ld seconds\n",
+               ts_end.tv_sec - ts_start.tv_sec, ts_end.tv_nsec - ts_start.tv_nsec);
         //row 是一个二级指针
         if(row != NULL){        //可以证明检索成功
             string tmp = "";
