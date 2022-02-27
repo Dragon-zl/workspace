@@ -252,10 +252,7 @@ void TcpClient::GetClientState()
         //调用相关的函数，进行处理
         if(CGIMysqlInertLine(str_recvdata)){
             //若成功，返回结果
-            if(StateVerifyCMD(m_sockfd, "Finish")){
-            }
-            else{
-            }
+            StateVerifyCMD(m_sockfd, "Finish");
         }
         else{
             StateVerifyCMD(m_sockfd, "fail");
@@ -307,8 +304,12 @@ bool TcpClient::CGIMysqlQueryLine(string& barcode)
             }
             //解锁
             m_lock.unlock();
+            //释放掉结果集产生的内存
+            mysql_free_result(result);
             return true;
         }
+        //释放掉结果集产生的内存
+        mysql_free_result(result);
     }
     //解锁
     m_lock.unlock();
@@ -321,21 +322,51 @@ bool TcpClient::CGIMysqlInertLine(string ClientData){
     pcba(barcode,date,status,pat_1,pat_2,pat_3) VALUES( 值1 ， 值2 ， 值3 , ···) ；
     */
     string sql_insert = "INSERT INTO pcba(barcode,date,status,pat_1,pat_2,pat_3) VALUES(";
-    
     sql_insert += ( ClientData + ")");
-
-
     //上锁
     m_lock.lock();
     //插入数据库
-    int res = mysql_query(mysql, sql_insert.c_str());
-    //解锁
-    m_lock.unlock();
-    //判断是否插入成功
-    if(!res){
+    //事务提交模式修改：修改数据库提交模式为0
+    /* if(mysql_query(mysql, "SET AUTOCOMMIT = 0")){
+        LOG_ERROR("%s", "SET AUTOCOMMIT = 0 fail");
+        m_lock.unlock();
+        return false;
+    }    */
+    //事务开始
+    if(mysql_query(mysql, "START TRANSACTION")){
+        LOG_ERROR("%s", "START TRANSACTION fail");
+        m_lock.unlock();
+        return false;
+    }
+    //数据插入
+    if(!mysql_query(mysql, sql_insert.c_str())){//&& mysql_affected_rows(mysql) != 0
+
+        //事务回滚
+        if(mysql_rollback(mysql))   //成功返回 0 失败 返回 非 0
+        {
+            LOG_ERROR("%s", "mysql_rollback fail");
+            m_lock.unlock();
+            return false;
+        }
+        //事务提交
+        if(mysql_commit(mysql))
+        {
+            LOG_ERROR("%s", "mysql_commit fail");
+            m_lock.unlock();
+            return false;
+        }
+        m_lock.unlock();
         return true;
     }
     else{
+        //事务提交
+        if(mysql_commit(mysql))
+        {
+            LOG_ERROR("%s", "mysql_commit fail");
+            m_lock.unlock();
+            return false;
+        }
+        m_lock.unlock();
         return false;
     }
 }
