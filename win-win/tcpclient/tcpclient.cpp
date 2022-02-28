@@ -276,7 +276,9 @@ void TcpClient::GetClientState()
 //调用数据库函数，通过主键查询一行数据
 bool TcpClient::CGIMysqlQueryLine(string& barcode)
 {
-    string sql_query = "SELECT * FROM pcba WHERE barcode = '" + barcode + "'";
+    string sql_query = "SELECT date, status, pat_1, pat_2, pat_3, pro_1, pro_2, pro_3 \
+                        FROM pcba,process_state WHERE pcba.barcode=process_state.barcode \
+                        AND pcba.barcode = '" + barcode + "'";
     //执行插叙语句
     barcode = "";
     //上锁
@@ -298,9 +300,9 @@ bool TcpClient::CGIMysqlQueryLine(string& barcode)
         //row 是一个二级指针
         if(row != NULL){        //可以证明检索成功
             string tmp = "";
-            for(int i = 0; i<6; ++i){
+            for(int i = 0; i<8; ++i){
                 tmp = row[i];
-                barcode += tmp;
+                barcode += (tmp + " ");
             }
             //解锁
             m_lock.unlock();
@@ -317,58 +319,76 @@ bool TcpClient::CGIMysqlQueryLine(string& barcode)
 }
 //调用数据库，插入一行数据
 bool TcpClient::CGIMysqlInertLine(string ClientData){
-    /*
-    INSERT LOW PRIORITY INTO 
-    pcba(barcode,date,status,pat_1,pat_2,pat_3) VALUES( 值1 ， 值2 ， 值3 , ···) ；
-    */
-    string sql_insert = "INSERT INTO pcba(barcode,date,status,pat_1,pat_2,pat_3) VALUES(";
-    sql_insert += ( ClientData + ")");
+    //查找 " 存在的位置
+    int index = ClientData.find('"');
+    //pcba表的插入语句
+    string pcba_insert = ClientData.substr(0 , index);
+
+    string process_insert = ClientData.substr(index + 1, ClientData.length() - index - 1);
+
     //上锁
     m_lock.lock();
     //插入数据库
     //事务提交模式修改：修改数据库提交模式为0
-    /* if(mysql_query(mysql, "SET AUTOCOMMIT = 0")){
+    if(mysql_query(mysql, "SET AUTOCOMMIT = 0")){
         LOG_ERROR("%s", "SET AUTOCOMMIT = 0 fail");
         m_lock.unlock();
         return false;
-    }    */
+    }   
     //事务开始
     if(mysql_query(mysql, "START TRANSACTION")){
         LOG_ERROR("%s", "START TRANSACTION fail");
         m_lock.unlock();
         return false;
     }
-    //数据插入
-    if(!mysql_query(mysql, sql_insert.c_str())){//&& mysql_affected_rows(mysql) != 0
-
-        //事务回滚
-        if(mysql_rollback(mysql))   //成功返回 0 失败 返回 非 0
-        {
-            LOG_ERROR("%s", "mysql_rollback fail");
-            m_lock.unlock();
-            return false;
-        }
-        //事务提交
-        if(mysql_commit(mysql))
-        {
-            LOG_ERROR("%s", "mysql_commit fail");
-            m_lock.unlock();
-            return false;
-        }
-        m_lock.unlock();
-        return true;
-    }
-    else{
-        //事务提交
-        if(mysql_commit(mysql))
-        {
-            LOG_ERROR("%s", "mysql_commit fail");
-            m_lock.unlock();
-            return false;
-        }
+    //设置保留点
+    if (mysql_query(mysql, "SAVEPOINT delete1"))
+    {
+        LOG_ERROR("%s", "SAVEPOINT delete1 fail");
         m_lock.unlock();
         return false;
     }
+    //pcba 数据插入
+    if (!mysql_query(mysql, pcba_insert.c_str()))
+    { //&& mysql_affected_rows(mysql) != 0
+        //process_state数据插入
+        if (!mysql_query(mysql, process_insert.c_str()))
+        {
+            //插入成功
+            //事务提交
+            return MySQL_COMMIT(mysql);
+        }
+        else{//插入失败，事务回滚
+            //事务回滚
+            if (mysql_query(mysql, "ROLLBACK TO delete1")) //成功返回 0 失败 返回 非 0
+            {
+                LOG_ERROR("%s", "ROLLBACK TO delete1 fail");
+                m_lock.unlock();
+                return false;
+            }
+            //事务提交
+            MySQL_COMMIT(mysql);
+            return false;
+        }
+    }
+    else{
+        //事务提交
+        MySQL_COMMIT(mysql);
+        return false;
+    }
+}
+//提交事务
+bool TcpClient::MySQL_COMMIT(MYSQL *mysql)
+{
+    //事务提交
+    if (mysql_commit(mysql))
+    {
+        LOG_ERROR("%s", "mysql_commit fail");
+        m_lock.unlock();
+        return false;
+    }
+    m_lock.unlock();
+    return true;
 }
 //解除映射
 void TcpClient::unmap(){
