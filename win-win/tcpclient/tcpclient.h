@@ -49,8 +49,11 @@ public:
 private:
     void init();
 	void unmap();
+    void PostState(string &str_recvdata);
+    void GETState(string &str_recvdata);
     bool CGIMysqlInertLine(string ClientData);
     bool CGIMysqlQueryLine(string& barcode);
+    bool CGIMysqlUPDATERows(string &sql_UPDATE); 
     bool MySQL_COMMIT(MYSQL *mysql);
     char *m_fileaddress;
     int m_write_idx;

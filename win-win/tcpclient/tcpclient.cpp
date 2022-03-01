@@ -188,6 +188,62 @@ bool TcpClient::StateVerifyCMD(int sockfd,const char * cmd){
         return false;
     }
 }
+//Post状态确定
+void TcpClient::PostState(string &str_recvdata)
+{
+    //判断为POST
+    m_method = POST;
+    //找到了
+    str_recvdata = str_recvdata.substr(14);
+    string file_path = "./";
+    file_path = file_path + str_recvdata;
+
+    //检查调用进程是否可以对指定的文件执行某种操作
+    if (access(file_path.c_str(), F_OK) == 0)
+    { //F_OK      测试文件是否存在
+        //表示文件存在
+        fd = fopen(file_path.c_str(), "w");
+        //创建一个用于写入的空文件。如果文件名称与已存在的文件相同，则会删除已有文件的内容，文件被视为一个新的空文件。
+    }
+    else
+    {
+        fd = fopen(file_path.c_str(), "a");
+        //追加到一个文件。写操作向文件末尾追加数据。如果文件不存在，则创建文件。
+    }
+    //状态验证成功CMD
+    StateVerifyCMD(m_sockfd, "StateVerify");
+}
+//GET状态确定
+void TcpClient::GETState(string &str_recvdata)
+{
+    //判断为GET
+    m_method = GET;
+    //截取掉 GET:Filename
+    str_recvdata = str_recvdata.substr(13);
+    string file_path = "./";
+    file_path += str_recvdata; //获得文件的绝对路径
+    //判断文件是否存在
+    if (access(file_path.c_str(), F_OK) == 0)
+    {
+        //获取文件属性
+        stat(file_path.c_str(), &m_file_stat);
+        //保存文件大小
+        write_file_size = m_file_stat.st_size;
+        if (write_file_size > 0)
+        {
+            //文件有内容
+            //打开文件
+            int fd = open(file_path.c_str(), O_RDONLY);
+            //将文件进行映射
+            m_fileaddress = (char *)mmap(0, m_file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+            //写入时的当前索引 = 0
+            m_write_idx = 0;
+            close(fd);
+            //发送确认GET命令,附带文件大小
+            StateVerifyCMD(m_sockfd, "StateVerify");
+        }
+    }
+}
 //获取客户端的请求状态
 void TcpClient::GetClientState()
 {
@@ -195,54 +251,12 @@ void TcpClient::GetClientState()
     //判断是否为 Post
     if(str_recvdata.find("Post:Filename:") != string::npos)
     {
-        //判断为POST
-        m_method = POST;
-        //找到了
-        str_recvdata = str_recvdata.substr(14);
-        string file_path = "./";
-        file_path = file_path + str_recvdata;
-
-        //检查调用进程是否可以对指定的文件执行某种操作
-        if(access(file_path.c_str(), F_OK) == 0){  //F_OK      测试文件是否存在
-            //表示文件存在
-            fd = fopen(file_path.c_str(),"w");
-            //创建一个用于写入的空文件。如果文件名称与已存在的文件相同，则会删除已有文件的内容，文件被视为一个新的空文件。
-        }
-        else{
-            fd = fopen(file_path.c_str() , "a");
-            //追加到一个文件。写操作向文件末尾追加数据。如果文件不存在，则创建文件。
-        }
-        //状态验证成功CMD
-        StateVerifyCMD(m_sockfd, "StateVerify");
+        PostState(str_recvdata);
     }
     //判断是否为 GET
     else if(str_recvdata.find("GET:Filename:") != string::npos)
     {
-        //判断为GET
-        m_method = GET;
-		//截取掉 GET:Filename
-		str_recvdata = str_recvdata.substr(13);
-		string file_path = "./";
-		file_path += str_recvdata;//获得文件的绝对路径
-		//判断文件是否存在
-		if(access(file_path.c_str(), F_OK) == 0){
-			//获取文件属性
-			stat(file_path.c_str(), &m_file_stat);
-	    	//保存文件大小
-			write_file_size = m_file_stat.st_size;
-			if(write_file_size > 0){
-				//文件有内容
-				//打开文件
-				int fd = open(file_path.c_str(), O_RDONLY);
-				//将文件进行映射
-				m_fileaddress = (char *)mmap(0, m_file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-				//写入时的当前索引 = 0
-				m_write_idx = 0;			
-				close(fd);
-				//发送确认GET命令,附带文件大小
-				StateVerifyCMD(m_sockfd, "StateVerify");
-			}
-		}
+        GETState(str_recvdata);
     }
     //判断是否为 mysql insert
     else if (str_recvdata.find("MySQL:Insert:") != string::npos)
@@ -272,9 +286,41 @@ void TcpClient::GetClientState()
             StateVerifyCMD(m_sockfd, "fail");
         }
     }
+    // UPDATE更新数据
+    else if (str_recvdata.find("MySQL:UPDATE:") != string::npos)
+    {
+        //截取
+        str_recvdata = str_recvdata.substr(13);
+        if(CGIMysqlUPDATERows(str_recvdata)){
+            //若成功，返回结果
+            StateVerifyCMD(m_sockfd, "Finish");
+        }
+        else{
+            StateVerifyCMD(m_sockfd, "fail");
+        }
+    }
+}
+//数据库，更新 n 行
+bool TcpClient::CGIMysqlUPDATERows(string &sql_UPDATE){
+    cout << sql_UPDATE << endl;
+
+    //上锁
+    m_lock.lock();
+    if (!mysql_query(mysql, sql_UPDATE.c_str()))
+    {
+        //解锁
+        m_lock.unlock();
+        return true;
+    }
+    else{
+        //解锁
+        m_lock.unlock();
+        return false;
+    }
+    
 }
 //调用数据库函数，通过主键查询一行数据
-bool TcpClient::CGIMysqlQueryLine(string& barcode)
+bool TcpClient::CGIMysqlQueryLine(string &barcode)
 {
     string sql_query = "SELECT date, status, pat_1, pat_2, pat_3, pro_1, pro_2, pro_3 \
                         FROM pcba,process_state WHERE pcba.barcode=process_state.barcode \
