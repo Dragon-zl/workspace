@@ -303,7 +303,6 @@ void TcpClient::GetClientState()
 //数据库，更新 n 行
 bool TcpClient::CGIMysqlUPDATERows(string &sql_UPDATE){
     cout << sql_UPDATE << endl;
-
     //上锁
     m_lock.lock();
     if (!mysql_query(mysql, sql_UPDATE.c_str()))
