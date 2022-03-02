@@ -51,6 +51,8 @@ private:
 	void unmap();
     void PostState(string &str_recvdata);
     void GETState(string &str_recvdata);
+    bool MySQLTransactionProcess(string sql_step_1, string sql_step_2);
+    bool CGIMysqlDeleteRows(string sql_delete);
     bool CGIMysqlInertLine(string ClientData);
     bool CGIMysqlQueryLine(string& barcode);
     bool CGIMysqlUPDATERows(string &sql_UPDATE); 

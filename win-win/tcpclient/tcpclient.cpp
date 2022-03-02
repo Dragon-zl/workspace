@@ -299,23 +299,120 @@ void TcpClient::GetClientState()
             StateVerifyCMD(m_sockfd, "fail");
         }
     }
+    // Delete删除数据
+    else if (str_recvdata.find("MySQL:Delete:") != string::npos){
+        //截取
+        str_recvdata = str_recvdata.substr(13);
+        if (CGIMysqlDeleteRows(str_recvdata))
+        {
+            //若成功，返回结果
+            StateVerifyCMD(m_sockfd, "Finish");
+        }
+        else
+        {
+            StateVerifyCMD(m_sockfd, "fail");
+        }
+    }
 }
-//数据库，更新 n 行
-bool TcpClient::CGIMysqlUPDATERows(string &sql_UPDATE){
-    cout << sql_UPDATE << endl;
+//数据库，删除 n 行
+bool TcpClient::CGIMysqlDeleteRows(string sql_delete){
+    //查找 " 存在的位置
+    int index = sql_delete.find(';');
+    //pcba表的插入语句
+    string sql_step_1 = sql_delete.substr(0, index);
+
+    string sql_step_2 = sql_delete.substr(index + 1, sql_delete.length() - index - 1);
+
+    return MySQLTransactionProcess(sql_step_1, sql_step_2);
+}
+//mysql事务管理
+bool TcpClient::MySQLTransactionProcess(string sql_step_1 , string sql_step_2){
     //上锁
     m_lock.lock();
-    if (!mysql_query(mysql, sql_UPDATE.c_str()))
+    //插入数据库
+    //事务提交模式修改：修改数据库提交模式为0
+    if (mysql_query(mysql, "SET AUTOCOMMIT = 0"))
     {
-        //解锁
-        m_lock.unlock();
-        return true;
-    }
-    else{
-        //解锁
+        LOG_ERROR("%s", "SET AUTOCOMMIT = 0 fail");
         m_lock.unlock();
         return false;
     }
+    //事务开始
+    if (mysql_query(mysql, "START TRANSACTION"))
+    {
+        LOG_ERROR("%s", "START TRANSACTION fail");
+        m_lock.unlock();
+        return false;
+    }
+    //设置保留点
+    if (mysql_query(mysql, "SAVEPOINT delete1"))
+    {
+        LOG_ERROR("%s", "SAVEPOINT delete1 fail");
+        m_lock.unlock();
+        return false;
+    }
+    //pcba 数据插入
+    if (!mysql_query(mysql, sql_step_1.c_str()))
+    { //&& mysql_affected_rows(mysql) != 0
+        //process_state数据插入
+        if (!mysql_query(mysql, sql_step_2.c_str()))
+        {
+            //插入成功
+            //事务提交
+            return MySQL_COMMIT(mysql);
+        }
+        else
+        { //插入失败，事务回滚
+            //事务回滚
+            if (mysql_query(mysql, "ROLLBACK TO delete1")) //成功返回 0 失败 返回 非 0
+            {
+                LOG_ERROR("%s", "ROLLBACK TO delete1 fail");
+                m_lock.unlock();
+                return false;
+            }
+            //事务提交
+            MySQL_COMMIT(mysql);
+            return false;
+        }
+    }
+    else
+    {
+        //事务提交
+        MySQL_COMMIT(mysql);
+        return false;
+    }
+}
+//数据库，更新 n 行
+bool TcpClient::CGIMysqlUPDATERows(string &sql_UPDATE){
+    //查找 " 存在的位置
+    int index = sql_UPDATE.find(';');
+    //pcba表的插入语句
+    string sete_1 = "";
+    string sete_2 = "";
+    if (index != -1)
+    {
+        sete_1 = sql_UPDATE.substr(0, index);
+        sete_2 = sql_UPDATE.substr(index + 1, sql_UPDATE.length() - index - 1);
+
+        return MySQLTransactionProcess(sete_1, sete_2);
+    }
+    else{
+        //上锁
+        m_lock.lock();
+        if (!mysql_query(mysql, sql_UPDATE.c_str()))
+        {
+            //解锁
+            m_lock.unlock();
+            return true;
+        }
+        else
+        {
+            //解锁
+            m_lock.unlock();
+            return false;
+        }
+    }
+    
     
 }
 //调用数据库函数，通过主键查询一行数据
@@ -371,56 +468,7 @@ bool TcpClient::CGIMysqlInertLine(string ClientData){
 
     string process_insert = ClientData.substr(index + 1, ClientData.length() - index - 1);
 
-    //上锁
-    m_lock.lock();
-    //插入数据库
-    //事务提交模式修改：修改数据库提交模式为0
-    if(mysql_query(mysql, "SET AUTOCOMMIT = 0")){
-        LOG_ERROR("%s", "SET AUTOCOMMIT = 0 fail");
-        m_lock.unlock();
-        return false;
-    }   
-    //事务开始
-    if(mysql_query(mysql, "START TRANSACTION")){
-        LOG_ERROR("%s", "START TRANSACTION fail");
-        m_lock.unlock();
-        return false;
-    }
-    //设置保留点
-    if (mysql_query(mysql, "SAVEPOINT delete1"))
-    {
-        LOG_ERROR("%s", "SAVEPOINT delete1 fail");
-        m_lock.unlock();
-        return false;
-    }
-    //pcba 数据插入
-    if (!mysql_query(mysql, pcba_insert.c_str()))
-    { //&& mysql_affected_rows(mysql) != 0
-        //process_state数据插入
-        if (!mysql_query(mysql, process_insert.c_str()))
-        {
-            //插入成功
-            //事务提交
-            return MySQL_COMMIT(mysql);
-        }
-        else{//插入失败，事务回滚
-            //事务回滚
-            if (mysql_query(mysql, "ROLLBACK TO delete1")) //成功返回 0 失败 返回 非 0
-            {
-                LOG_ERROR("%s", "ROLLBACK TO delete1 fail");
-                m_lock.unlock();
-                return false;
-            }
-            //事务提交
-            MySQL_COMMIT(mysql);
-            return false;
-        }
-    }
-    else{
-        //事务提交
-        MySQL_COMMIT(mysql);
-        return false;
-    }
+    return MySQLTransactionProcess(pcba_insert, process_insert);
 }
 //提交事务
 bool TcpClient::MySQL_COMMIT(MYSQL *mysql)
