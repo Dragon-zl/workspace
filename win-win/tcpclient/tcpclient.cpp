@@ -117,6 +117,7 @@ void TcpClient::init(){
     timer_flag = 0;//超时flag默认为0
     improv = 0;
 	m_fileaddress = NULL;
+    sql_list = new list<string>();
     memset(m_read_buf, '\0', READ_BUFFER_SIZE);
     memset(m_write_buf, '\0', WRITE_BUFFER_SIZE);
     memset(m_real_file, '\0', FILENAME_LEN);
@@ -314,19 +315,9 @@ void TcpClient::GetClientState()
         }
     }
 }
-//数据库，删除 n 行
-bool TcpClient::CGIMysqlDeleteRows(string sql_delete){
-    //查找 " 存在的位置
-    int index = sql_delete.find(';');
-    //pcba表的插入语句
-    string sql_step_1 = sql_delete.substr(0, index);
-
-    string sql_step_2 = sql_delete.substr(index + 1, sql_delete.length() - index - 1);
-
-    return MySQLTransactionProcess(sql_step_1, sql_step_2);
-}
 //mysql事务管理
-bool TcpClient::MySQLTransactionProcess(string sql_step_1 , string sql_step_2){
+bool TcpClient::MySQLTransactionProcess(string sql_step_1, string sql_step_2)
+{
     //上锁
     m_lock.lock();
     //插入数据库
@@ -382,7 +373,18 @@ bool TcpClient::MySQLTransactionProcess(string sql_step_1 , string sql_step_2){
         return false;
     }
 }
-//数据库，更新 n 行
+//数据库：删(delete)
+bool TcpClient::CGIMysqlDeleteRows(string sql_delete){
+    //查找 " 存在的位置
+    int index = sql_delete.find(';');
+    //pcba表的插入语句
+    string sql_step_1 = sql_delete.substr(0, index);
+
+    string sql_step_2 = sql_delete.substr(index + 1, sql_delete.length() - index - 1);
+
+    return MySQLTransactionProcess(sql_step_1, sql_step_2);
+}
+//数据库：改(UPDATE)
 bool TcpClient::CGIMysqlUPDATERows(string &sql_UPDATE){
     //查找 " 存在的位置
     int index = sql_UPDATE.find(';');
@@ -415,7 +417,7 @@ bool TcpClient::CGIMysqlUPDATERows(string &sql_UPDATE){
     
     
 }
-//调用数据库函数，通过主键查询一行数据
+//数据库：查(select)
 bool TcpClient::CGIMysqlQueryLine(string &barcode)
 {
     string sql_query = "SELECT date, status, pat_1, pat_2, pat_3, pro_1, pro_2, pro_3 \
@@ -459,7 +461,7 @@ bool TcpClient::CGIMysqlQueryLine(string &barcode)
     m_lock.unlock();
     return false;
 }
-//调用数据库，插入一行数据
+//数据库：增(insert)
 bool TcpClient::CGIMysqlInertLine(string ClientData){
     //查找 " 存在的位置
     int index = ClientData.find('"');
