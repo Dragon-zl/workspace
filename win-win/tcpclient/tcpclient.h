@@ -8,6 +8,7 @@
 
 #include <arpa/inet.h>
 #include <map>
+#include <vector>
 
 class TcpClient
 {
@@ -51,13 +52,13 @@ private:
 	void unmap();
     void PostState(string &str_recvdata);
     void GETState(string &str_recvdata);
-    bool MySQLTransactionProcess(string sql_step_1, string sql_step_2);
+    bool MySQLTransactionProcess();
     bool CGIMysqlDeleteRows(string sql_delete);
     bool CGIMysqlInertLine(string ClientData);
     bool CGIMysqlQueryLine(string& barcode);
     bool CGIMysqlUPDATERows(string &sql_UPDATE); 
     bool MySQL_COMMIT(MYSQL *mysql);
-    list<string> *sql_list;
+    vector<string> sql_list;
     char *m_fileaddress;
     int m_write_idx;
 	int write_file_size;

@@ -117,7 +117,7 @@ void TcpClient::init(){
     timer_flag = 0;//超时flag默认为0
     improv = 0;
 	m_fileaddress = NULL;
-    sql_list = new list<string>();
+    //sql_list = new list<string>();
     memset(m_read_buf, '\0', READ_BUFFER_SIZE);
     memset(m_write_buf, '\0', WRITE_BUFFER_SIZE);
     memset(m_real_file, '\0', FILENAME_LEN);
@@ -316,7 +316,7 @@ void TcpClient::GetClientState()
     }
 }
 //mysql事务管理
-bool TcpClient::MySQLTransactionProcess(string sql_step_1, string sql_step_2)
+bool TcpClient::MySQLTransactionProcess()
 {
     //上锁
     m_lock.lock();
@@ -342,35 +342,28 @@ bool TcpClient::MySQLTransactionProcess(string sql_step_1, string sql_step_2)
         m_lock.unlock();
         return false;
     }
-    //pcba 数据插入
-    if (!mysql_query(mysql, sql_step_1.c_str()))
-    { //&& mysql_affected_rows(mysql) != 0
-        //process_state数据插入
-        if (!mysql_query(mysql, sql_step_2.c_str()))
+    int len = sql_list.size();
+    int i;
+    for (i = 0; i < len; ++i)
+    {
+        if (mysql_query(mysql, sql_list[i].c_str()))
         {
-            //插入成功
-            //事务提交
-            return MySQL_COMMIT(mysql);
-        }
-        else
-        { //插入失败，事务回滚
-            //事务回滚
-            if (mysql_query(mysql, "ROLLBACK TO delete1")) //成功返回 0 失败 返回 非 0
-            {
-                LOG_ERROR("%s", "ROLLBACK TO delete1 fail");
-                m_lock.unlock();
-                return false;
-            }
-            //事务提交
-            MySQL_COMMIT(mysql);
-            return false;
+            //如果失败
+            mysql_query(mysql, "ROLLBACK delete1");
+            LOG_ERROR("%s", "ROLLBACK delete1");
+            break;
         }
     }
-    else
-    {
-        //事务提交
-        MySQL_COMMIT(mysql);
+    //事务提交
+    MySQL_COMMIT(mysql);
+    sql_list.clear();
+    //解锁
+    m_lock.unlock();
+    if(i != len){
         return false;
+    }
+    else{
+        return true;
     }
 }
 //数据库：删(delete)
@@ -382,7 +375,7 @@ bool TcpClient::CGIMysqlDeleteRows(string sql_delete){
 
     string sql_step_2 = sql_delete.substr(index + 1, sql_delete.length() - index - 1);
 
-    return MySQLTransactionProcess(sql_step_1, sql_step_2);
+    //return MySQLTransactionProcess(sql_step_1, sql_step_2);
 }
 //数据库：改(UPDATE)
 bool TcpClient::CGIMysqlUPDATERows(string &sql_UPDATE){
@@ -396,7 +389,7 @@ bool TcpClient::CGIMysqlUPDATERows(string &sql_UPDATE){
         sete_1 = sql_UPDATE.substr(0, index);
         sete_2 = sql_UPDATE.substr(index + 1, sql_UPDATE.length() - index - 1);
 
-        return MySQLTransactionProcess(sete_1, sete_2);
+        //return MySQLTransactionProcess(sete_1, sete_2);
     }
     else{
         //上锁
@@ -464,13 +457,19 @@ bool TcpClient::CGIMysqlQueryLine(string &barcode)
 //数据库：增(insert)
 bool TcpClient::CGIMysqlInertLine(string ClientData){
     //查找 " 存在的位置
-    int index = ClientData.find('"');
+    int index ;
     //pcba表的插入语句
-    string pcba_insert = ClientData.substr(0 , index);
+    for(int i = 0; i<5; i++){
+        index = ClientData.find(';');
+        string sql_insert = ClientData.substr(0, index);
+        //将解析到的sql入链表
+        sql_list.push_back(sql_insert);
+        //去除上一个sql
+        ClientData = ClientData.substr(index + 1);
+    }
+    sql_list.push_back(ClientData);
 
-    string process_insert = ClientData.substr(index + 1, ClientData.length() - index - 1);
-
-    return MySQLTransactionProcess(pcba_insert, process_insert);
+    return MySQLTransactionProcess();
 }
 //提交事务
 bool TcpClient::MySQL_COMMIT(MYSQL *mysql)
