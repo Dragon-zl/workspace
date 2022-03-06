@@ -349,13 +349,12 @@ bool TcpClient::MySQLTransactionProcess()
         if (mysql_query(mysql, sql_list[i].c_str()))
         {
             //如果失败
-            mysql_query(mysql, "ROLLBACK delete1");
+            mysql_query(mysql, "ROLLBACK TO delete1");
             LOG_ERROR("%s", "ROLLBACK delete1");
             break;
         }
     }
-    //事务提交
-    MySQL_COMMIT(mysql);
+    
     sql_list.clear();
     //解锁
     m_lock.unlock();
