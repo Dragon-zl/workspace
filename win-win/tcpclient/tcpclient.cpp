@@ -322,26 +322,26 @@ bool TcpClient::MySQLTransactionProcess()
     m_lock.lock();
     //插入数据库
     //事务提交模式修改：修改数据库提交模式为0
-    if (mysql_query(mysql, "SET AUTOCOMMIT = 0"))
+    /* if (mysql_query(mysql, "SET AUTOCOMMIT = 0"))
     {
         LOG_ERROR("%s", "SET AUTOCOMMIT = 0 fail");
         m_lock.unlock();
         return false;
-    }
-    //事务开始
+    } */
+    /* //事务开始
     if (mysql_query(mysql, "START TRANSACTION"))
     {
         LOG_ERROR("%s", "START TRANSACTION fail");
         m_lock.unlock();
         return false;
-    }
+    } */
     //设置保留点
-    if (mysql_query(mysql, "SAVEPOINT delete1"))
+    /* if (mysql_query(mysql, "SAVEPOINT delete1"))
     {
         LOG_ERROR("%s", "SAVEPOINT delete1 fail");
         m_lock.unlock();
         return false;
-    }
+    } */
     int len = sql_list.size();
     int i;
     for (i = 0; i < len; ++i)
@@ -456,6 +456,26 @@ bool TcpClient::CGIMysqlQueryLine(string &barcode)
 //数据库：增(insert)
 bool TcpClient::CGIMysqlInertLine(string ClientData){
     //查找 " 存在的位置
+    if(ClientData == "start"){
+        if (mysql_query(mysql, "SET AUTOCOMMIT = 0"))
+        {
+            LOG_ERROR("%s", "SET AUTOCOMMIT = 0 fail");
+            //m_lock.unlock();
+            return false;
+        }
+        //事务开始
+        if (mysql_query(mysql, "START TRANSACTION"))
+        {
+            LOG_ERROR("%s", "START TRANSACTION fail");
+            //m_lock.unlock();
+            return false;
+        }
+        return true;
+    }
+    else if(ClientData == "over"){
+        mysql_commit(mysql);
+        return true;
+    }
     int index ;
     //pcba表的插入语句
     for(int i = 0; i<5; i++){
