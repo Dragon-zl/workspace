@@ -270,7 +270,6 @@ void TcpClient::GetClientState()
             StateVerifyCMD(m_sockfd, "Finish");
         }
         else{
-            mysql_commit(mysql);
             StateVerifyCMD(m_sockfd, "fail");
         }
     }
