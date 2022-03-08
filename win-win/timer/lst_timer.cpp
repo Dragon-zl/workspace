@@ -226,7 +226,6 @@ void cb_func(client_data *user_data){
     assert(user_data);
     //关闭文件描述符
     close(user_data->sockfd);
-    
     //减少连接数
     TcpClient::m_user_count--;
 }

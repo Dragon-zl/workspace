@@ -441,6 +441,7 @@ void WebServer::eventLoop(){
         {
             utils.timer_handler();
             LOG_INFO("%s", "timer tick");
+            cout << "timer tick" << endl;
             timeout = false;
         }
     }
