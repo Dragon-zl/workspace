@@ -93,6 +93,7 @@ public:
            */
             pool_->tasks.emplace(forward<F>(task));
         }
+        //发出信号
         pool_->cond.notify_one();
     }
 

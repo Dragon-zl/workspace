@@ -56,15 +56,16 @@ const char* HttpConn::GetIP() const {
 int HttpConn::GetPort() const {
     return addr_.sin_port;
 }
-
+/*读事件：读取数据函数*/
 ssize_t HttpConn::read(int* saveErrno) {
     ssize_t len = -1;
+    /*ET模式下：一次性读完*/
     do {
         len = readBuff_.ReadFd(fd_, saveErrno);
         if (len <= 0) {
             break;
         }
-    } while (isET);
+    } while (isET);//循环条件：是否为ET模式
     return len;
 }
 
@@ -96,17 +97,11 @@ ssize_t HttpConn::write(int* saveErrno) {
 
 bool HttpConn::process() {
     request_.Init();
+    /*返回读取到的字节数*/
     if(readBuff_.ReadableBytes() <= 0) {
         return false;
     }
-    else if(request_.parse(readBuff_)) {
-        LOG_DEBUG("%s", request_.path().c_str());
-        response_.Init(srcDir, request_.path(), request_.IsKeepAlive(), 200);
-    } else {
-        response_.Init(srcDir, request_.path(), false, 400);
-    }
 
-    response_.MakeResponse(writeBuff_);
     /* 响应头 */
     iov_[0].iov_base = const_cast<char*>(writeBuff_.Peek());
     iov_[0].iov_len = writeBuff_.ReadableBytes();

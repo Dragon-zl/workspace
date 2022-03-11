@@ -99,11 +99,12 @@ void WebServer::Start() {
                 /*关闭客户端函数*/
                 CloseConn_(&users_[fd]);
             }
-            /*有读时间响应*/
+            /*有读事件 响应*/
             else if(events & EPOLLIN) {
                 assert(users_.count(fd) > 0);
                 DealRead_(&users_[fd]);
             }
+            /*写事件 响应*/
             else if(events & EPOLLOUT) {
                 assert(users_.count(fd) > 0);
                 DealWrite_(&users_[fd]);
@@ -164,6 +165,7 @@ void WebServer::DealListen_() {
 }
 
 void WebServer::DealRead_(HttpConn* client) {
+    //判断传入参数是否为空
     assert(client);
     /*重新调整 定时器容器*/
     ExtentTime_(client);
@@ -181,7 +183,7 @@ void WebServer::ExtentTime_(HttpConn* client) {
     assert(client);
     if(timeoutMS_ > 0) { timer_->adjust(client->GetFd(), timeoutMS_); }
 }
-
+/*读事件：线程池调用函数*/
 void WebServer::OnRead_(HttpConn* client) {
     assert(client);
     int ret = -1;
