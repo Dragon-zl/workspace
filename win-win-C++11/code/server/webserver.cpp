@@ -16,14 +16,17 @@ WebServer::WebServer(
             port_(port), openLinger_(OptLinger), timeoutMS_(timeoutMS), isClose_(false),
             timer_(new HeapTimer()), threadpool_(new ThreadPool(threadNum)), epoller_(new Epoller())
     {
+        /*获取当前目录的绝对路径*/
     srcDir_ = getcwd(nullptr, 256);
     assert(srcDir_);
     strncat(srcDir_, "/resources/", 16);
-    HttpConn::userCount = 0;
-    HttpConn::srcDir = srcDir_;
-    /*获取一个mysql连接实例*/
+
+    Client::userCount = 0;
+    Client::srcDir = srcDir_;
+    /*获取一个SqlConnPool连接实例： 登录本地数据库引擎，创建 connPoolNum 个MySQL对象入队等待调用*/
     SqlConnPool::Instance()->Init("localhost", sqlPort, sqlUser, sqlPwd, dbName, connPoolNum);
 
+    /*注册监听、等待连接文件描述符为 ET 或者 LT模式*/
     InitEventMode_(trigMode);
     if(!InitSocket_()) { isClose_ = true;}
 
@@ -38,7 +41,7 @@ WebServer::WebServer(
                             (listenEvent_ & EPOLLET ? "ET": "LT"),
                             (connEvent_ & EPOLLET ? "ET": "LT"));
             LOG_INFO("LogSys level: %d", logLevel);
-            LOG_INFO("srcDir: %s", HttpConn::srcDir);
+            LOG_INFO("srcDir: %s", Client::srcDir);
             LOG_INFO("SqlConnPool num: %d, ThreadPool num: %d", connPoolNum, threadNum);
         }
     }
@@ -73,9 +76,9 @@ void WebServer::InitEventMode_(int trigMode) {
         connEvent_ |= EPOLLET;
         break;
     }
-    HttpConn::isET = (connEvent_ & EPOLLET);
+    Client::isET = (connEvent_ & EPOLLET);
 }
-
+/*等待客户单连接*/
 void WebServer::Start() {
     int timeMS = -1;  /* epoll wait timeout == -1 无事件将阻塞 */
     if(!isClose_) { LOG_INFO("========== Server start =========="); }
@@ -83,10 +86,12 @@ void WebServer::Start() {
         if(timeoutMS_ > 0) {
             timeMS = timer_->GetNextTick();
         }
+        /*epoll_wait 返回就绪文件描述符个数*/
         int eventCnt = epoller_->Wait(timeMS);
         for(int i = 0; i < eventCnt; i++) {
-            /* 处理事件 */
+            /* 获取文件描述符 */
             int fd = epoller_->GetEventFd(i);
+            /* 获取就绪文件描述符的就绪事件*/
             uint32_t events = epoller_->GetEvents(i);
             /*有新的客户端连接*/
             if(fd == listenFd_) {
@@ -114,7 +119,7 @@ void WebServer::Start() {
         }
     }
 }
-
+/*服务器向客户端发送连接失败信息：原因服务器连接客户端数已满*/
 void WebServer::SendError_(int fd, const char*info) {
     assert(fd > 0);
     int ret = send(fd, info, strlen(info), 0);
@@ -123,8 +128,8 @@ void WebServer::SendError_(int fd, const char*info) {
     }
     close(fd);
 }
-
-void WebServer::CloseConn_(HttpConn* client) {
+/*处理客户端主动断开连接*/
+void WebServer::CloseConn_(Client* client) {
     assert(client);
     LOG_INFO("Client[%d] quit!", client->GetFd());
     /*从epoll集合中删除*/
@@ -132,29 +137,32 @@ void WebServer::CloseConn_(HttpConn* client) {
     /*关闭连接*/
     client->Close();
 }
-
+/*添加新的客户端连接*/
 void WebServer::AddClient_(int fd, sockaddr_in addr) {
     assert(fd > 0);
     users_[fd].init(fd, addr);
-    /*通过智能指针，往定时器中添加一个成员*/
+    
     if(timeoutMS_ > 0) {
         /*
             bind:动态生成新的函数
         */
+        /*望 定时器堆 中添加新成员*/
         timer_->add(fd, timeoutMS_, bind(&WebServer::CloseConn_, this, &users_[fd]));
     }
+    /*添加输入事件、ET或LT模式*/
     epoller_->AddFd(fd, EPOLLIN | connEvent_);
+    /*非阻塞*/
     SetFdNonblock(fd);
     LOG_INFO("Client[%d] in!", users_[fd].GetFd());
 }
-
+/*处理监听文件描述符：等待连接*/
 void WebServer::DealListen_() {
     struct sockaddr_in addr;
     socklen_t len = sizeof(addr);
     do {
         int fd = accept(listenFd_, (struct sockaddr *)&addr, &len);
         if(fd <= 0) { return;}
-        else if(HttpConn::userCount >= MAX_FD) {
+        else if(Client::userCount >= MAX_FD) {
             SendError_(fd, "Server busy!");
             LOG_WARN("Clients is full!");
             return;
@@ -163,8 +171,8 @@ void WebServer::DealListen_() {
         AddClient_(fd, addr);
     } while(listenEvent_ & EPOLLET);
 }
-
-void WebServer::DealRead_(HttpConn* client) {
+/*处理读事件：接受客户端连接文件描述符发送过来的数据*/
+void WebServer::DealRead_(Client* client) {
     //判断传入参数是否为空
     assert(client);
     /*重新调整 定时器容器*/
@@ -172,57 +180,65 @@ void WebServer::DealRead_(HttpConn* client) {
     /*线程池中添加任务*/
     threadpool_->AddTask(bind(&WebServer::OnRead_, this, client));
 }
-
-void WebServer::DealWrite_(HttpConn* client) {
+/*处理写事件：向传入的客户端连接文件描述符发送数据*/
+void WebServer::DealWrite_(Client* client) {
     assert(client);
+    /*重新调整客户端对应的定时器*/
     ExtentTime_(client);
     threadpool_->AddTask(bind(&WebServer::OnWrite_, this, client));
 }
-
-void WebServer::ExtentTime_(HttpConn* client) {
+/*重新调整客户端对应的定时器*/
+void WebServer::ExtentTime_(Client* client) {
     assert(client);
     if(timeoutMS_ > 0) { timer_->adjust(client->GetFd(), timeoutMS_); }
 }
-/*读事件：线程池调用函数*/
-void WebServer::OnRead_(HttpConn* client) {
+/*读取客户端数据*/
+void WebServer::OnRead_(Client* client) {
     assert(client);
     int ret = -1;
     int readErrno = 0;
+    /*调用 http类read函数*/
     ret = client->read(&readErrno);
     if(ret <= 0 && readErrno != EAGAIN) {
         CloseConn_(client);
         return;
     }
+    /*读取数据后的数据分析处理函数*/
     OnProcess(client);
 }
-
-void WebServer::OnProcess(HttpConn* client) {
+/*读取数据后的数据分析处理函数*/
+void WebServer::OnProcess(Client* client) {
     if(client->process()) {
+        /*注册写事件*/
         epoller_->ModFd(client->GetFd(), connEvent_ | EPOLLOUT);
     } else {
+        /*注册读事件*/
         epoller_->ModFd(client->GetFd(), connEvent_ | EPOLLIN);
     }
 }
-
-void WebServer::OnWrite_(HttpConn* client) {
+/*写数据到客户端*/
+void WebServer::OnWrite_(Client* client) {
     assert(client);
     int ret = -1;
     int writeErrno = 0;
+    /*调用客户端 write 函数*/
     ret = client->write(&writeErrno);
     if(client->ToWriteBytes() == 0) {
         /* 传输完成 */
-        if(client->IsKeepAlive()) {
+        /* if(client->IsKeepAlive()) {
             OnProcess(client);
             return;
-        }
+        } */
     }
     else if(ret < 0) {
+        /*系统提示再写一次的事件： EAGAIN*/
         if(writeErrno == EAGAIN) {
-            /* 继续传输 */
+            /* 发送失败 重新注册  EPOLLOUT 事件*/
             epoller_->ModFd(client->GetFd(), connEvent_ | EPOLLOUT);
             return;
         }
     }
+    /*如果 即未发送成功， 又不是 因为 EAGAIN 事件导致，主动关闭客户端连接*/
     CloseConn_(client);
 }
 
@@ -249,7 +265,7 @@ bool WebServer::InitSocket_() {
         LOG_ERROR("Create socket error!", port_);
         return false;
     }
-
+    /*设置配好的 openLinger_： 优雅关闭连接*/
     ret = setsockopt(listenFd_, SOL_SOCKET, SO_LINGER, &optLinger, sizeof(optLinger));
     if(ret < 0) {
         close(listenFd_);
@@ -259,7 +275,13 @@ bool WebServer::InitSocket_() {
 
     int optval = 1;
     /* 端口复用 */
-    /* 只有最后一个套接字会正常接收数据。 */
+    /* 只有最后一个套接字会正常接收数据。- 防止服务器重启时之前绑定的端口还未释放
+                                        - 程序突然退出而系统没有释放端口
+                                        SO_REUSEADDR允许您的服务器   绑定到a中的地址   TIME_WAIT状态。 
+                                        此套接字选项告诉内核即使此端口忙（处于TIME_WAIT状态），
+                                        也要继续并重新使用它。如果它很忙，但是有另一个状态，
+                                        你仍然会得到一个已经处于使用中的地址错误。如果您的服务器已关闭，
+                                        然后在其端口上的套接字仍处于活动状态时立即重新启动，则此功能非常有用。 */
     ret = setsockopt(listenFd_, SOL_SOCKET, SO_REUSEADDR, (const void*)&optval, sizeof(int));
     if(ret == -1) {
         LOG_ERROR("set socket setsockopt error !");
@@ -286,11 +308,12 @@ bool WebServer::InitSocket_() {
         close(listenFd_);
         return false;
     }
+    /*设置为非阻塞*/
     SetFdNonblock(listenFd_);
     LOG_INFO("Server port:%d", port_);
     return true;
 }
-
+/*设置文件描述符为非阻塞：ET模式下必须是非阻塞*/
 int WebServer::SetFdNonblock(int fd) {
     assert(fd > 0);
     return fcntl(fd, F_SETFL, fcntl(fd, F_GETFD, 0) | O_NONBLOCK);

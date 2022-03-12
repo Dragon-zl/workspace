@@ -7,84 +7,91 @@
 
 Buffer::Buffer(int initBuffSize) : buffer_(initBuffSize), readPos_(0), writePos_(0) {}
 
+/*写索引 - 读索引 = 读到的数据量*/
 size_t Buffer::ReadableBytes() const {
     return writePos_ - readPos_;
 }
-/*返回可以写的数据*/
+/*容器总的数据量 - 写索引 = 可用于读或写的数据量空间*/
 size_t Buffer::WritableBytes() const {
     return buffer_.size() - writePos_;
 }
-
+/*返回读索引*/
 size_t Buffer::PrependableBytes() const {
     return readPos_;
 }
-/*返回为发送的数据的首地址*/
+/*读索引 + 读写容器的首地址 = 读索引的相对位置*/
 const char* Buffer::Peek() const {
     return BeginPtr_() + readPos_;
 }
-
+/*读完数据后 读索引 右移*/
 void Buffer::Retrieve(size_t len) {
     assert(len <= ReadableBytes());
     readPos_ += len;
 }
-
+/*将读索引 右移*/
 void Buffer::RetrieveUntil(const char* end) {
     assert(Peek() <= end );
     Retrieve(end - Peek());
 }
-
+/*清空读写容器内的所有数据，读写索引都归零*/
 void Buffer::RetrieveAll() {
     bzero(&buffer_[0], buffer_.size());
     readPos_ = 0;
     writePos_ = 0;
 }
-
+/*将读到的数据char 类型转化为 string类型*/
 std::string Buffer::RetrieveAllToStr() {
     std::string str(Peek(), ReadableBytes());
     RetrieveAll();
     return str;
 }
-
+/*返回写索引相对容器首地址的位置*/
 const char* Buffer::BeginWriteConst() const {
     return BeginPtr_() + writePos_;
 }
-
+/*返回写索引相对容器首地址的位置*/
 char* Buffer::BeginWrite() {
     return BeginPtr_() + writePos_;
 }
-
+/*写索引 右移*/
 void Buffer::HasWritten(size_t len) {
     writePos_ += len;
 } 
 
+/*将string字符串数组 复制到写缓冲容器*/
 void Buffer::Append(const std::string& str) {
+    /*data函数：返回sting字符串数组的首地址*/
     Append(str.data(), str.length());
 }
-
+/*将string字符串数组 复制到写缓冲容器*/
 void Buffer::Append(const void* data, size_t len) {
     assert(data);
+    /*强制类型转换*/
     Append(static_cast<const char*>(data), len);
 }
-/*buff扩容函数
-参数：
-    str：buff的首地址
-    len：需要扩容的字节数
-*/
+/*将string字符串数组 复制到写缓冲容器*/
 void Buffer::Append(const char* str, size_t len) {
     assert(str);
+    /*判断是否有足够的写缓冲容器：没有则扩容*/
     EnsureWriteable(len);
+    /*将string 字符串，复制到读写容器上*/
     std::copy(str, str + len, BeginWrite());
+    /*将写索引 右移*/
     HasWritten(len);
 }
-
+/*将string字符串数组 复制到写缓冲容器*/
 void Buffer::Append(const Buffer& buff) {
     Append(buff.Peek(), buff.ReadableBytes());
 }
 
+/*判断是否有足够的存储发送数据量的容器空间，没有则扩容*/
 void Buffer::EnsureWriteable(size_t len) {
+    /*比较可以发送的数据空间 和 len的大小*/
     if(WritableBytes() < len) {
+        /*不够：则进行扩容*/
         MakeSpace_(len);
     }
+    /*如果有足够的发送区空间*/
     assert(WritableBytes() >= len);
 }
 /*读事件：读取数据函数
@@ -126,9 +133,9 @@ ssize_t Buffer::ReadFd(int fd, int* saveErrno) {
     }
     return len;
 }
-
+/*数据发送*/
 ssize_t Buffer::WriteFd(int fd, int* saveErrno) {
-    /*保存为发送出去的数据*/
+    /*返回可以发送的数据量*/
     size_t readSize = ReadableBytes();
     ssize_t len = write(fd, Peek(), readSize);
     if(len < 0) {
@@ -138,11 +145,11 @@ ssize_t Buffer::WriteFd(int fd, int* saveErrno) {
     readPos_ += len;
     return len;
 }
-/*返回buffer容器当前的下标*/
+/*返回buffer容器的首地址*/
 char* Buffer::BeginPtr_() {
     return &*buffer_.begin();
 }
-/*返回buffer的首地址*/
+/*返回读写存储容器的首地址*/
 const char* Buffer::BeginPtr_() const {
     return &*buffer_.begin();
 }

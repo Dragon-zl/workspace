@@ -1,7 +1,6 @@
 /*
- * @Author       : mark
- * @Date         : 2020-06-19
- * @copyleft Apache 2.0
+ * @Author       : The Lin
+ * @Date         : 2022-03-01
  */ 
 
 #ifndef SQLCONNRAII_H

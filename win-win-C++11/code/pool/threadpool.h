@@ -1,7 +1,6 @@
 /*
- * @Author       : mark
- * @Date         : 2020-06-15
- * @copyleft Apache 2.0
+ * @Author       : The Lin
+ * @Date         : 2022-03-05
  */ 
 
 #ifndef THREADPOOL_H
@@ -12,7 +11,6 @@
 #include <queue>
 #include <thread>
 #include <functional>
-using namespace std;
 class ThreadPool {
 public:
     /*
@@ -20,10 +18,10 @@ public:
             作用就是防止类构造函数的隐式自动转换
     */
     /*
-                                                make_shared: 比shared_ptr更好，shared_ptr需要维护引用计数的信息
-                                                            make_shared可以减少内存分配的次数
+                                        make_shared: 比shared_ptr更好，shared_ptr需要维护引用计数的信息
+                                                    make_shared可以减少内存分配的次数
                                                     */
-    explicit ThreadPool(size_t threadCount = 8): pool_(make_shared<Pool>()) {
+    explicit ThreadPool(size_t threadCount = 8): pool_(std::make_shared<Pool>()) {
         /*
             assert：断言函数，判断条件不成立则报错误信息
             */
@@ -32,13 +30,14 @@ public:
         size_t可能会提高代码的可移植性、有效性或者可读性
         */
         /*
-        分配 threadCount 个线程，每个线程为循环判断是否有任务需要处理
+        创建 threadCount 个线程，每个线程为循环判断是否有任务需要处理
        */
         for (size_t i = 0; i < threadCount; i++)
         {
-            thread([pool = pool_]
+            std::thread([pool = pool_]
             {
-                unique_lock<mutex> locker(pool->mtx);
+                /*加锁*/
+                std::unique_lock<std::mutex> locker(pool->mtx);
                 while (true)
                 {
                     if (!pool->tasks.empty())
@@ -60,7 +59,7 @@ public:
             }).detach();/*设置线程分离*/
         }
     }
-
+    /*使用 default ：将函数隐式的声明为内联函数，内联函数减少高频调用时的栈内存*/
     ThreadPool() = default;
 
     ThreadPool(ThreadPool&&) = default;
@@ -73,17 +72,18 @@ public:
                 lock_guard类是一个mutex封装者
                 lock_guard会在析构函数中释放调锁资源
                 */
-                lock_guard<mutex> locker(pool_->mtx);
+                std::lock_guard<std::mutex> locker(pool_->mtx);
                 pool_->isClosed = true;
             }
             pool_->cond.notify_all();
         }
     }
-
+    /*添加任务到队列中*/
     template<class F>
     void AddTask(F&& task) {
         {
-            lock_guard<mutex> locker(pool_->mtx);
+            /*上锁*/
+            std::lock_guard<std::mutex> locker(pool_->mtx);
             /*
             emplace比常规的push_back少调用了一次复制构造函数
             高效
@@ -91,7 +91,7 @@ public:
             /*
             forward：
            */
-            pool_->tasks.emplace(forward<F>(task));
+            pool_->tasks.emplace(std::forward<F>(task));
         }
         //发出信号
         pool_->cond.notify_one();
@@ -99,12 +99,17 @@ public:
 
 private:
     struct Pool {
-        mutex mtx;
-        condition_variable cond;
+        /*互斥锁*/
+        std::mutex mtx;
+        /*条件变量*/
+        std::condition_variable cond;
+        /*是否关闭线程池标记位*/
         bool isClosed;
-        queue<function<void()>> tasks;
+        /*任务队列：元素类型为函数指针*/
+        std::queue<std::function<void()>> tasks;
     };
-    shared_ptr<Pool> pool_;
+    /*智能指针：shared_ptr -- Pool *类型*/
+    std::shared_ptr<Pool> pool_;
 };
 
 

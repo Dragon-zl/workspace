@@ -1,7 +1,6 @@
 /*
- * @Author       : mark
- * @Date         : 2020-06-16
- * @copyleft Apache 2.0
+ * @Author       : The Lin
+ * @Date         : 2022-02-25
  */ 
 #ifndef LOG_H
 #define LOG_H
@@ -22,8 +21,11 @@ public:
     void init(int level, const char* path = "./log", 
                 const char* suffix =".log",
                 int maxQueueCapacity = 1024);
-
+    /*
+        获取一个log实例
+    */
     static Log* Instance();
+    /*调用异步写日志*/
     static void FlushLogThread();
 
     void write(int level, const char *format,...);
@@ -49,6 +51,7 @@ private:
 
     int MAX_LINES_;
 
+    /*记录单个日志的行数*/
     int lineCount_;
     int toDay_;
 
